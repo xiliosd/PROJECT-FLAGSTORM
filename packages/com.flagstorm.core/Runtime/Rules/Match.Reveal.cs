@@ -53,10 +53,12 @@ namespace Flagstorm.Core.Rules
             var cells = LandWithin(enemy.Island, command.Target, missile.Radius);
             var events = new List<IMatchEvent> { new MissileImpact(side, missile.Id, command.Target, cells) };
 
-            // Las banderas son indestructibles: el misil solo daña defensas.
+            // Las banderas son indestructibles y los señuelos también lo son para los misiles: si un misil
+            // pudiera destruirlos, bastaría un disparo para distinguir señuelo de bandera.
+            // Solo un robot los desenmascara.
             foreach (var cell in cells)
             {
-                if (!enemy.Defenses.TryGetValue(cell, out var defense))
+                if (!enemy.Defenses.TryGetValue(cell, out var defense) || defense.WeaponId == PrototypeArsenal.Decoy)
                 {
                     continue;
                 }

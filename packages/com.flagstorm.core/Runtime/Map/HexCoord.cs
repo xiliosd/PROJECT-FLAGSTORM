@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 
 namespace Flagstorm.Core.Map
 {
@@ -47,7 +48,9 @@ namespace Flagstorm.Core.Map
 
         public override int GetHashCode() => unchecked((Q * 397) ^ R);
 
-        public override string ToString() => $"({Q},{R})";
+        // Cultura invariante: la huella del estado debe ser igual en cualquier dispositivo (spec §11).
+        public override string ToString() =>
+            "(" + Q.ToString(CultureInfo.InvariantCulture) + "," + R.ToString(CultureInfo.InvariantCulture) + ")";
 
         public int DistanceTo(HexCoord other)
         {

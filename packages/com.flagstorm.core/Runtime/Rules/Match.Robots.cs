@@ -38,11 +38,15 @@ namespace Flagstorm.Core.Rules
             own.Energy -= robot.EnergyCost;
             var state = new RobotState(_nextRobotId++, robot.Id, command.LandingCell, robot.HitPoints, robot.MovementPoints);
             own.Robots.Add(state);
-            return CommandResult.Accepted(new IMatchEvent[]
+            var events = new List<IMatchEvent>
             {
                 new RobotDeployed(side, state.RobotId, robot.Id, command.LandingCell),
                 new EnergyChanged(side, own.Energy),
-            });
+            };
+
+            // Desembarcar justo sobre una bandera o un señuelo cuenta como llegar a esa casilla.
+            ResolveArrival(side, own, enemy, command.LandingCell, events);
+            return CommandResult.Accepted(events);
         }
 
         private CommandResult ApplyMove(Side side, MoveRobotCommand command)
