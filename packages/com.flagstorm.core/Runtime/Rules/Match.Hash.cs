@@ -29,16 +29,26 @@ namespace Flagstorm.Core.Rules
                 Append(text, "revealed", Cells(state.RevealedEnemyCells));
                 foreach (var defense in state.Defenses.OrderBy(d => d.Key, CellOrder.Instance))
                 {
-                    Append(text, "defense", $"{defense.Key}:{defense.Value.WeaponId}:{defense.Value.HitPoints}");
+                    var defenseText = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0}:{1}:{2}",
+                        defense.Key,
+                        defense.Value.WeaponId,
+                        defense.Value.HitPoints);
+                    Append(text, "defense", defenseText);
                 }
 
                 foreach (var robot in state.Robots.OrderBy(r => r.RobotId))
                 {
-                    Append(
-                        text,
-                        "robot",
-                        $"{robot.RobotId}:{robot.WeaponId}:{robot.Position}:"
-                        + $"{robot.HitPoints}:{robot.MovementPointsLeft}");
+                    var robotText = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0}:{1}:{2}:{3}:{4}",
+                        robot.RobotId,
+                        robot.WeaponId,
+                        robot.Position,
+                        robot.HitPoints,
+                        robot.MovementPointsLeft);
+                    Append(text, "robot", robotText);
                 }
             }
 
