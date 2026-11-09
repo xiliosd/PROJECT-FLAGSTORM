@@ -34,7 +34,11 @@ dotnet test --collect:"XPlat Code Coverage"        # con cobertura (meta ≥ 60 
 dotnet format --verify-no-changes                  # estilo (StyleCop + .editorconfig)
 ```
 
-Las pruebas EditMode de Unity se describen en el plan (tarea 10).
+Pruebas EditMode de Unity (desde la raíz del repo):
+
+```bash
+"C:/Program Files/Unity/Hub/Editor/6000.6.8f1/Editor/Unity.exe" -batchmode -nographics   -projectPath unity/Flagstorm -runTests -testPlatform EditMode -testResults TestResults/editmode.xml
+```
 
 ## Deployment
 
@@ -55,7 +59,7 @@ Pendiente (tarea 12 del plan).
 - Pruebas: NUnit 4.6.1, NUnit3TestAdapter 6.3.1, Microsoft.NET.Test.Sdk 18.11.0,
   coverlet.collector 10.1.0.
 - Estilo: StyleCop.Analyzers 1.2.0-beta.556 + `.editorconfig`.
-- Motor: Unity 6 LTS + URP (desde la tarea 10; la versión exacta se anota aquí al instalarla).
+- Motor: Unity 6000.6.8f1 + URP 17.6.0 + Input System 1.20.1 + Test Framework 1.8.0 (`unity/Flagstorm`).
 
 ### Excepciones a los lineamientos
 
