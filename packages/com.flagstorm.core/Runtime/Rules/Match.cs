@@ -142,10 +142,31 @@ namespace Flagstorm.Core.Rules
             {
                 case EndTurnCommand _:
                     return ApplyEndTurn(side);
+                case LaunchDroneCommand drone:
+                    return ApplyDrone(side, drone);
+                case FireMissileCommand missile:
+                    return ApplyMissile(side, missile);
                 default:
                     // Provisional hasta que existan las reglas de este comando (tareas 5 a 7 del plan).
                     return CommandResult.Rejected(RejectionReason.WrongCategory);
             }
+        }
+
+        // Valida arma, categoría y energía; no gasta nada.
+        private RejectionReason CheckWeapon(Side side, string weaponId, WeaponCategory category, out WeaponDefinition weapon)
+        {
+            if (weaponId == null || !_arsenal.TryGetValue(weaponId, out weapon))
+            {
+                weapon = null;
+                return RejectionReason.UnknownWeapon;
+            }
+
+            if (weapon.Category != category)
+            {
+                return RejectionReason.WrongCategory;
+            }
+
+            return weapon.EnergyCost > _sides[side].Energy ? RejectionReason.NotEnoughEnergy : RejectionReason.None;
         }
 
         private CommandResult ApplySetup(Side side, SetupCommand setup)
