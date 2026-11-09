@@ -2,7 +2,7 @@
 
 - **Fecha:** 2026-11-09
 - **Autor:** Oscar Dueñas (con asistencia de Claude Code)
-- **Estado:** borrador para aprobación
+- **Estado:** aprobado por Oscar (2026-11-09)
 - **Nombre:** "Flagstorm" es nombre de trabajo. Una búsqueda web (2026-11-09) no encontró juegos,
   apps ni marcas con ese nombre; falta la verificación oficial (SIC, USPTO, tiendas, dominio) antes
   de invertir en logo y marca.
