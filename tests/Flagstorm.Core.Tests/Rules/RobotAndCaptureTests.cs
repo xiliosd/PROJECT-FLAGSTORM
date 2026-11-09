@@ -109,7 +109,8 @@ namespace Flagstorm.Core.Tests.Rules
             Assert.That(match.Phase, Is.EqualTo(MatchPhase.Finished));
             Assert.That(match.Winner, Is.EqualTo(Side.Blue));
             Assert.That(match.ViewFor(Side.Blue).OwnRobots.Single().Position, Is.EqualTo(new HexCoord(1, 1)));
-            Assert.That(match.Submit(Side.Blue, new EndTurnCommand()).Reason, Is.EqualTo(RejectionReason.MatchFinished));
+            Assert.That(
+                match.Submit(Side.Blue, new EndTurnCommand()).Reason, Is.EqualTo(RejectionReason.MatchFinished));
         }
     }
 }

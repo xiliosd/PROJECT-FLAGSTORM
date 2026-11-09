@@ -13,7 +13,8 @@ namespace Flagstorm.Core.Rules
         private readonly Dictionary<string, WeaponDefinition> _arsenal;
         private readonly List<RecordedCommand> _history = new List<RecordedCommand>();
 
-        public Match(IslandMap blueIsland, IslandMap redIsland, RulesConfig rules, IReadOnlyList<WeaponDefinition> arsenal)
+        public Match(
+            IslandMap blueIsland, IslandMap redIsland, RulesConfig rules, IReadOnlyList<WeaponDefinition> arsenal)
         {
             if (blueIsland == null || redIsland == null)
             {
@@ -158,7 +159,8 @@ namespace Flagstorm.Core.Rules
         }
 
         // Valida arma, categoría y energía; no gasta nada.
-        private RejectionReason CheckWeapon(Side side, string weaponId, WeaponCategory category, out WeaponDefinition weapon)
+        private RejectionReason CheckWeapon(
+            Side side, string weaponId, WeaponCategory category, out WeaponDefinition weapon)
         {
             if (weaponId == null || !_arsenal.TryGetValue(weaponId, out weapon))
             {

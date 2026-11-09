@@ -3,7 +3,8 @@ using Flagstorm.Core.Map;
 
 namespace Flagstorm.Core.Rules
 {
-    public sealed record RobotInfo(int RobotId, string WeaponId, HexCoord Position, int HitPoints, int MovementPointsLeft);
+    public sealed record RobotInfo(
+        int RobotId, string WeaponId, HexCoord Position, int HitPoints, int MovementPointsLeft);
 
     // Lo que un bando puede saber. La IA solo recibe esto, así no puede hacer trampa (spec §5.2).
     public sealed class PlayerView

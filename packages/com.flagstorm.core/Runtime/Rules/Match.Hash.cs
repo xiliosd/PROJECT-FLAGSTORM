@@ -37,7 +37,8 @@ namespace Flagstorm.Core.Rules
                     Append(
                         text,
                         "robot",
-                        $"{robot.RobotId}:{robot.WeaponId}:{robot.Position}:{robot.HitPoints}:{robot.MovementPointsLeft}");
+                        $"{robot.RobotId}:{robot.WeaponId}:{robot.Position}:"
+                        + $"{robot.HitPoints}:{robot.MovementPointsLeft}");
                 }
             }
 

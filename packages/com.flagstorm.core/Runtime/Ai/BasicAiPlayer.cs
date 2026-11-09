@@ -157,7 +157,8 @@ namespace Flagstorm.Core.Ai
             var occupied = new HashSet<HexCoord>(view.OwnRobots.Select(r => r.Position));
             DeployRobotCommand best = null;
             var bestCost = int.MaxValue;
-            foreach (var robot in arsenal.Where(w => w.Category == WeaponCategory.Capture && w.EnergyCost <= view.Energy))
+            var robots = arsenal.Where(w => w.Category == WeaponCategory.Capture && w.EnergyCost <= view.Energy);
+            foreach (var robot in robots)
             {
                 foreach (var coast in view.EnemyIsland.CoastCells.Where(c => !occupied.Contains(c)))
                 {
@@ -223,7 +224,9 @@ namespace Flagstorm.Core.Ai
             if (turret != null && view.OwnTurrets.Count < MaxTurrets)
             {
                 // Primero frenar robots invasores; si no hay, proteger banderas.
-                var near = free.Where(c => view.EnemyRobotsOnOwnIsland.Any(r => r.Position.DistanceTo(c) <= 1)).ToList();
+                var near = free
+                    .Where(c => view.EnemyRobotsOnOwnIsland.Any(r => r.Position.DistanceTo(c) <= 1))
+                    .ToList();
                 if (near.Count == 0 && view.EnemyRobotsOnOwnIsland.Count == 0)
                 {
                     near = free.Where(c => view.OwnFlags.Any(f => f.DistanceTo(c) == 1)).ToList();

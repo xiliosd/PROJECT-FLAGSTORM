@@ -36,7 +36,8 @@ namespace Flagstorm.Core.Rules
             }
 
             own.Energy -= robot.EnergyCost;
-            var state = new RobotState(_nextRobotId++, robot.Id, command.LandingCell, robot.HitPoints, robot.MovementPoints);
+            var state = new RobotState(
+                _nextRobotId++, robot.Id, command.LandingCell, robot.HitPoints, robot.MovementPoints);
             own.Robots.Add(state);
             var events = new List<IMatchEvent>
             {

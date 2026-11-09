@@ -13,7 +13,8 @@ namespace Flagstorm.Core.Tests.Support
             new HexCoord(1, 1), new HexCoord(2, 1), new HexCoord(1, 2), new HexCoord(2, 2), new HexCoord(0, 3),
         };
 
-        public static readonly IReadOnlyList<HexCoord> DefaultTurrets = new[] { new HexCoord(3, 1), new HexCoord(0, 2) };
+        public static readonly IReadOnlyList<HexCoord> DefaultTurrets =
+            new[] { new HexCoord(3, 1), new HexCoord(0, 2) };
 
         public static Match NewSetup(RulesConfig rules = null) =>
             new Match(TestIslands.Small(), TestIslands.Small(), rules ?? RulesConfig.Default, PrototypeArsenal.All);
