@@ -9,6 +9,7 @@ Estado: **etapa 1, prototipo de reglas** (núcleo de reglas en C# + escena holog
 ## Enlaces de documentación
 
 - Documento de diseño: [docs/superpowers/specs/2026-11-09-flagstorm-design.md](docs/superpowers/specs/2026-11-09-flagstorm-design.md)
+- Repositorio: https://github.com/xiliosd/PROJECT-FLAGSTORM
 - Plan de la etapa 1: [docs/superpowers/plans/2026-11-09-flagstorm-etapa-1-prototipo.md](docs/superpowers/plans/2026-11-09-flagstorm-etapa-1-prototipo.md)
 
 ## Referencias de API
@@ -21,7 +22,7 @@ No aplica: el juego de un jugador no expone ni consume APIs en esta etapa.
 
 ## Distintivos
 
-No aplica todavía (sin CI ni repositorio remoto).
+No aplica todavía (sin CI configurado).
 
 ## Ambiente de pruebas
 
