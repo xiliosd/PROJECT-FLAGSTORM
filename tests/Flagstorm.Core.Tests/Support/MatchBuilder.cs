@@ -27,6 +27,14 @@ namespace Flagstorm.Core.Tests.Support
             return match;
         }
 
+        public static (Match Match, int RobotId) NewPlayingWithBlueRobotAt(HexCoord coast, RulesConfig rules = null)
+        {
+            var match = NewPlaying(rules);
+            var result = match.Submit(Side.Blue, new DeployRobotCommand(PrototypeArsenal.TrackedRobot, coast));
+            Assert.That(result.IsAccepted, Is.True, $"despliegue: {result.Reason}");
+            return (match, result.Events.OfType<RobotDeployed>().Single().RobotId);
+        }
+
         public static SetupCommand DefaultSetupFor(RulesConfig rules) =>
             new SetupCommand(DefaultFlags.Take(rules.FlagsPerSide).ToList(), DefaultTurrets);
     }

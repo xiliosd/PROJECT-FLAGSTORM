@@ -146,6 +146,10 @@ namespace Flagstorm.Core.Rules
                     return ApplyDrone(side, drone);
                 case FireMissileCommand missile:
                     return ApplyMissile(side, missile);
+                case DeployRobotCommand deploy:
+                    return ApplyDeploy(side, deploy);
+                case MoveRobotCommand move:
+                    return ApplyMove(side, move);
                 default:
                     // Provisional hasta que existan las reglas de este comando (tareas 5 a 7 del plan).
                     return CommandResult.Rejected(RejectionReason.WrongCategory);

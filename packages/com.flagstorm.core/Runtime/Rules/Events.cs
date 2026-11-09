@@ -26,4 +26,14 @@ namespace Flagstorm.Core.Rules
 
     // Revelar el tipo de defensa destruida es intencional: destruir algo te dice qué era.
     public sealed record DefenseDestroyed(Side Owner, HexCoord Cell, string WeaponId) : IMatchEvent;
+
+    public sealed record RobotDeployed(Side Owner, int RobotId, string WeaponId, HexCoord Cell) : IMatchEvent;
+
+    public sealed record RobotMoved(Side Owner, int RobotId, IReadOnlyList<HexCoord> Path) : IMatchEvent;
+
+    public sealed record FlagCaptured(Side By, HexCoord Cell, int TotalCaptured) : IMatchEvent;
+
+    public sealed record DecoyExposed(Side By, HexCoord Cell) : IMatchEvent;
+
+    public sealed record MatchWon(Side Winner) : IMatchEvent;
 }
