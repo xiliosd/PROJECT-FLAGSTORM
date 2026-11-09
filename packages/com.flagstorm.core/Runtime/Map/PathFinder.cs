@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Flagstorm.Core.Arsenal;
 
 namespace Flagstorm.Core.Map
 {
@@ -95,6 +96,27 @@ namespace Flagstorm.Core.Map
             }
 
             return result;
+        }
+
+        public static IReadOnlyList<HexCoord> FindPath(
+            IslandMap map, WeaponDefinition robot, HexCoord from, HexCoord to) =>
+            FindPath(map, CostOf(robot), from, to);
+
+        public static int PathCost(IslandMap map, WeaponDefinition robot, IReadOnlyList<HexCoord> path) =>
+            PathCost(map, CostOf(robot), path);
+
+        public static IReadOnlyList<HexCoord> TruncateToBudget(
+            IslandMap map, WeaponDefinition robot, IReadOnlyList<HexCoord> path, int budget) =>
+            TruncateToBudget(map, CostOf(robot), path, budget);
+
+        private static Func<TerrainType, int> CostOf(WeaponDefinition robot)
+        {
+            if (robot == null)
+            {
+                throw new ArgumentNullException(nameof(robot));
+            }
+
+            return robot.MovementCostOn;
         }
 
         private static IReadOnlyList<HexCoord> Rebuild(
