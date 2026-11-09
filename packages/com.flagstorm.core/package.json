@@ -1,0 +1,7 @@
+{
+  "name": "com.flagstorm.core",
+  "version": "0.1.0",
+  "displayName": "Flagstorm Core",
+  "description": "Reglas deterministas de Flagstorm, sin dependencias de Unity.",
+  "unity": "6000.0"
+}

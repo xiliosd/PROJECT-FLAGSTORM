@@ -1,2 +1,13 @@
 .superpowers/
 .remember/
+bin/
+obj/
+TestResults/
+unity/Flagstorm/[Ll]ibrary/
+unity/Flagstorm/[Tt]emp/
+unity/Flagstorm/[Oo]bj/
+unity/Flagstorm/[Bb]uild*/
+unity/Flagstorm/[Ll]ogs/
+unity/Flagstorm/[Uu]ser[Ss]ettings/
+unity/Flagstorm/*.csproj
+unity/Flagstorm/*.sln
