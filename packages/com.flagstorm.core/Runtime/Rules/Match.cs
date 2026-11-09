@@ -150,9 +150,10 @@ namespace Flagstorm.Core.Rules
                     return ApplyDeploy(side, deploy);
                 case MoveRobotCommand move:
                     return ApplyMove(side, move);
+                case BuildDefenseCommand build:
+                    return ApplyBuildDefense(side, build);
                 default:
-                    // Provisional hasta que existan las reglas de este comando (tareas 5 a 7 del plan).
-                    return CommandResult.Rejected(RejectionReason.WrongCategory);
+                    throw new ArgumentException($"Comando no soportado: {command.GetType().Name}", nameof(command));
             }
         }
 

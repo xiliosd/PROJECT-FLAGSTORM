@@ -36,4 +36,10 @@ namespace Flagstorm.Core.Rules
     public sealed record DecoyExposed(Side By, HexCoord Cell) : IMatchEvent;
 
     public sealed record MatchWon(Side Winner) : IMatchEvent;
+
+    public sealed record DefenseBuilt(Side Owner, HexCoord Cell, string WeaponId) : IMatchEvent;
+
+    public sealed record TurretFired(Side Owner, HexCoord Turret, int TargetRobotId, int Damage) : IMatchEvent;
+
+    public sealed record RobotDestroyed(Side Owner, int RobotId, HexCoord Cell) : IMatchEvent;
 }
