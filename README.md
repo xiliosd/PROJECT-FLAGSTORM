@@ -1,6 +1,6 @@
 # Flagstorm
 
-Juego móvil de estrategia por turnos sobre islas para Android e iPhone. Cada bando esconde
+Juego móvil de estrategia por turnos sobre islas para Android (iPhone pospuesto). Cada bando esconde
 5 banderas en su isla y usa drones, misiles y robots especializados por terreno para capturar las
 del rival. Nombre de trabajo; falta la verificación oficial de marca.
 

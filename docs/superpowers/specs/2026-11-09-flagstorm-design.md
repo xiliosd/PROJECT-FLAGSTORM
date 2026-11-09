@@ -25,7 +25,7 @@ Lo que engancha, según Oscar, es:
 2. **El viaje entre islas:** ver el ataque cruzando el mar hasta el impacto, y avanzar de una isla
    a la siguiente en una campaña.
 
-El objetivo de negocio **[decisión de Oscar]** es publicarlo en Google Play y App Store para que
+El objetivo de negocio **[decisión de Oscar]** es publicarlo en Google Play (y más adelante en App Store) para que
 lo descargue mucha gente y genere ingresos.
 
 ## 2. El concepto central
@@ -46,7 +46,8 @@ se habló de tiempo real; Oscar lo cambió explícitamente a turnos).
 ### Metas de la versión 1.0
 - Campaña para un jugador contra la IA: **20 islas, con un jefe cada 5** (islas 5, 10, 15 y 20)
   **[decisión de Oscar]**.
-- Disponible en **Android y iPhone** **[decisión de Oscar]**.
+- Disponible en **Android** **[decisión de Oscar, 2026-11-09]**. iPhone queda **pospuesto**, no descartado:
+  el código se mantiene multiplataforma, pero no se compila, prueba ni publica para iOS por ahora.
 - Gráficos modernos y llamativos, con dos vistas (real y holográfica) **[decisión de Oscar]**.
 - Monetización justa desde el lanzamiento (sección 10).
 - Arquitectura preparada para agregar multijugador después sin reescribir el juego (sección 11).
@@ -208,10 +209,10 @@ Español e inglés desde el lanzamiento.
 ## 7. Plataformas y tecnología [propuesta de Claude; Oscar delegó la elección]
 - **Motor:** Unity 6 (versión LTS vigente, fijada al crear el proyecto) con **C#** y el Universal
   Render Pipeline (URP).
-- **Plataformas:** Android e iOS desde un mismo código.
-- **Restricción:** Oscar desarrolla en Windows. Para compilar y publicar en iOS hace falta una Mac
-  o un servicio de compilación en la nube (Unity Build Automation o una Mac alquilada), además de
-  una cuenta de Apple Developer (USD 99/año).
+- **Plataformas:** solo **Android** por ahora **[decisión de Oscar, 2026-11-09]**. No usar APIs
+  exclusivas de Android en la lógica del juego, para que agregar iOS después no exija reescribirla.
+- **Cuando se retome iOS:** hará falta una Mac o un servicio de compilación en la nube (Unity Build
+  Automation o una Mac alquilada), además de una cuenta de Apple Developer (USD 99/año).
 - **Datos:** la campaña funciona **sin conexión**. El progreso se guarda localmente, con respaldo
   opcional en la nube mediante Google Play Games Services o Game Center **[propuesta de Claude]**.
 - **Dependencias:** cada paquete o plugin nuevo se verifica en su registro oficial (Unity
@@ -296,8 +297,8 @@ botón "Jugar con alguien cerca"; el multijugador en línea será asíncrono, co
 - **Equipo [decisión de Oscar]:** Oscar solo, con asistencia de IA (Claude Code). No hay artista
   ni otros desarrolladores.
 - **Presupuesto y fecha:** no se definieron. **[Propuesta de Claude]:** se asume un presupuesto
-  bajo (paquetes de arte de la Asset Store, cuenta de Apple, compilación de iOS en la nube cuando
-  haga falta) y ninguna fecha fija.
+  bajo (paquetes de arte de la Asset Store y cuenta de Google Play Console, USD 25 de pago único) y
+  ninguna fecha fija. Sin costos de Apple mientras iOS esté pospuesto.
 - **Consecuencia para el arte [propuesta de Claude]:** como no hay artista, el arte "a medida" se
   logra **ensamblando y recoloreando** piezas de paquetes con licencia comercial (robots y armas
   modulares), con efectos y la vista holográfica hechos con shaders, y con una interfaz propia.
@@ -312,7 +313,7 @@ botón "Jugar con alguien cerca"; el multijugador en línea será asíncrono, co
      transición, el tutorial y el guardado.
   3. **Contenido:** las regiones 2 a 4, los idiomas y el modo Difícil.
   4. **Producto:** tienda de apariencias, anuncios, privacidad, accesibilidad, rendimiento y
-     publicación (primero en Android, luego en iOS).
+     publicación en Google Play.
 
   Si la etapa 1 muestra que las reglas no divierten, se ajustan antes de invertir en arte.
 
