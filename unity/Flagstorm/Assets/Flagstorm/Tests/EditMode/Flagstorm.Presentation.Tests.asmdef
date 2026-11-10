@@ -3,6 +3,7 @@
   "rootNamespace": "Flagstorm.Presentation.Tests",
   "references": [
     "Flagstorm.Core",
+    "Flagstorm.Presentation",
     "UnityEngine.TestRunner",
     "UnityEditor.TestRunner"
   ],
