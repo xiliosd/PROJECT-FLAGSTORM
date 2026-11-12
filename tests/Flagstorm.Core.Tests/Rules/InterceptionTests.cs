@@ -90,10 +90,48 @@ namespace Flagstorm.Core.Tests.Rules
             var third = match.Submit(Side.Blue, missile);
 
             Assert.That(third.Events.OfType<MissileIntercepted>().Single().RemainingHitPoints, Is.EqualTo(0));
+            Assert.That(third.Events.OfType<DefenseDestroyed>().Single().Cell, Is.EqualTo(ShieldCell));
             Assert.That(match.ViewFor(Side.Red).OwnDefenses.Keys, Does.Not.Contain(ShieldCell));
 
             var fourth = match.Submit(Side.Blue, missile);
             Assert.That(fourth.Events.OfType<MissileImpact>().Count(), Is.EqualTo(1));
+        }
+
+        [Test]
+        public void Drone_WithTwoShieldsInRange_NearestWins()
+        {
+            var match = MatchWithRedBuilt(
+                (PrototypeArsenal.DroneShield, GuardCell), (PrototypeArsenal.DroneShield, ShieldCell));
+            var result = match.Submit(Side.Blue, new LaunchDroneCommand(PrototypeArsenal.Drone, ShieldCell));
+            Assert.That(result.Events.OfType<DroneShotDown>().Single().Shield, Is.EqualTo(ShieldCell));
+        }
+
+        [Test]
+        public void Drone_WithTwoShieldsAtSameDistance_FirstInCellOrderWins()
+        {
+            var match = MatchWithRedBuilt(
+                (PrototypeArsenal.DroneShield, ShieldCell), (PrototypeArsenal.DroneShield, GuardCell));
+            var result = match.Submit(Side.Blue, new LaunchDroneCommand(PrototypeArsenal.Drone, new HexCoord(2, 2)));
+            Assert.That(result.Events.OfType<DroneShotDown>().Single().Shield, Is.EqualTo(GuardCell));
+        }
+
+        [Test]
+        public void AntiMissile_DoesNotShootDownDrones()
+        {
+            var match = MatchWithRedBuilt((PrototypeArsenal.AntiMissile, ShieldCell));
+            var result = match.Submit(Side.Blue, new LaunchDroneCommand(PrototypeArsenal.Drone, new HexCoord(2, 2)));
+            Assert.That(result.Events.OfType<DroneShotDown>(), Is.Empty);
+            Assert.That(result.Events.OfType<CellsRevealed>().Single().Cells, Has.Count.EqualTo(7));
+        }
+
+        [Test]
+        public void DroneShield_DoesNotInterceptMissiles()
+        {
+            var match = MatchWithRedBuilt((PrototypeArsenal.DroneShield, ShieldCell));
+            var result = match.Submit(
+                Side.Blue, new FireMissileCommand(PrototypeArsenal.StandardMissile, new HexCoord(2, 2)));
+            Assert.That(result.Events.OfType<MissileIntercepted>(), Is.Empty);
+            Assert.That(result.Events.OfType<MissileImpact>().Count(), Is.EqualTo(1));
         }
 
         [Test]

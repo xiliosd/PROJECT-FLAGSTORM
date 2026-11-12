@@ -95,7 +95,8 @@ namespace Flagstorm.Core.Rules
             }
 
             // Los defensores en el área también reciben el daño; los robots del atacante nunca.
-            foreach (var guard in enemy.Guards.Where(g => cells.Contains(g.Position)).OrderBy(g => g.RobotId).ToList())
+            var guardsInArea = enemy.Guards.Where(g => cells.Contains(g.Position)).OrderBy(g => g.RobotId).ToList();
+            foreach (var guard in guardsInArea)
             {
                 guard.HitPoints -= missile.EffectivePowerOn(enemy.Island.TerrainAt(guard.Position));
                 if (guard.HitPoints <= 0)
