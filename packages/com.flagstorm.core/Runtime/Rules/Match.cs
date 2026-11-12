@@ -95,6 +95,8 @@ namespace Flagstorm.Core.Rules
                 Loadout = own.Loadout,
                 OwnDefenses = DefensesIn(own),
                 OwnFlags = Sorted(own.Flags),
+                OwnGuards = own.Guards.OrderBy(g => g.RobotId).Select(g => g.ToInfo()).ToList(),
+                KnownEnemyGuards = KnownGuardsOf(own, enemy),
                 OwnDecoys = Sorted(DefenseCells(own, PrototypeArsenal.Decoy)),
                 OwnTurrets = TurretsIn(own, own.Defenses.Keys),
                 RevealedEnemyCells = Sorted(own.RevealedEnemyCells),
@@ -185,7 +187,9 @@ namespace Flagstorm.Core.Rules
                 case MoveRobotCommand move:
                     return ApplyMove(side, move);
                 case BuildDefenseCommand build:
-                    return ApplyBuildDefense(side, build);
+                    return IsGuardWeapon(build.WeaponId)
+                        ? ApplyPlaceGuard(side, build)
+                        : ApplyBuildDefense(side, build);
                 default:
                     throw new ArgumentException($"Comando no soportado: {command.GetType().Name}", nameof(command));
             }
@@ -230,6 +234,12 @@ namespace Flagstorm.Core.Rules
             foreach (var placement in setup.FreeDefenses)
             {
                 var defense = _arsenal[placement.WeaponId];
+                if (defense.Category == WeaponCategory.Guard)
+                {
+                    state.Guards.Add(new GuardState(_nextRobotId++, defense.Id, placement.Cell, defense.HitPoints));
+                    continue;
+                }
+
                 state.Defenses[placement.Cell] = new DefenseState(defense.Id, defense.HitPoints);
             }
 
@@ -253,11 +263,12 @@ namespace Flagstorm.Core.Rules
                 return false;
             }
 
-            // Hasta que los defensores entren en la preparación (tarea 3), solo se regalan defensas Defend.
             var allowed = setup.FreeDefenses.All(
                 p => state.Loadout.Contains(p.WeaponId)
                     && _arsenal.TryGetValue(p.WeaponId, out var weapon)
-                    && weapon.Category == WeaponCategory.Defend);
+                    && weapon.Category != WeaponCategory.Capture
+                    && weapon.Category != WeaponCategory.Reveal
+                    && weapon.Category != WeaponCategory.Destroy);
             var island = state.Island;
             var all = setup.Flags.Concat(setup.FreeDefenses.Select(p => p.Cell)).ToList();
             return allowed

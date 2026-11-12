@@ -143,11 +143,13 @@ namespace Flagstorm.Core.Tests.Rules
         }
 
         [Test]
-        public void Setup_RejectsGuardAsFreeDefense_ForNow()
+        public void Setup_PlacesFreeGuard()
         {
-            var result = NewStarterMatch().Submit(
-                Side.Blue, SetupWith(new DefensePlacement(PrototypeArsenal.BeachGuard, new HexCoord(3, 1))));
-            Assert.That(result.Reason, Is.EqualTo(RejectionReason.InvalidSetup));
+            var match = NewStarterMatch();
+            match.Submit(Side.Blue, SetupWith(new DefensePlacement(PrototypeArsenal.BeachGuard, new HexCoord(3, 1))));
+            var guard = match.ViewFor(Side.Blue).OwnGuards.Single();
+            Assert.That(guard.Position, Is.EqualTo(new HexCoord(3, 1)));
+            Assert.That(guard.HitPoints, Is.EqualTo(4));
         }
 
         [Test]

@@ -6,6 +6,8 @@ namespace Flagstorm.Core.Rules
     public sealed record RobotInfo(
         int RobotId, string WeaponId, HexCoord Position, int HitPoints, int MovementPointsLeft);
 
+    public sealed record GuardInfo(int RobotId, string WeaponId, HexCoord Post, HexCoord Position, int HitPoints);
+
     public sealed record DefenseInfo(string WeaponId, int HitPoints);
 
     // Lo que un bando puede saber. La IA solo recibe esto, así no puede hacer trampa (spec §5.2).
@@ -33,6 +35,11 @@ namespace Flagstorm.Core.Rules
 
         // Todas las defensas propias (señuelos incluidos), ordenadas por CellOrder.
         public IReadOnlyDictionary<HexCoord, DefenseInfo> OwnDefenses { get; internal set; }
+
+        public IReadOnlyList<GuardInfo> OwnGuards { get; internal set; }
+
+        // Defensores rivales en celdas reveladas o a distancia 1 o menos de un robot propio.
+        public IReadOnlyList<GuardInfo> KnownEnemyGuards { get; internal set; }
 
         public IReadOnlyCollection<HexCoord> OwnDecoys { get; internal set; }
 

@@ -16,6 +16,31 @@ namespace Flagstorm.Core.Rules
         public int HitPoints { get; set; }
     }
 
+    // Defensor: robot que vive en la isla propia y cuida un puesto dentro de su zona de guardia.
+    internal sealed class GuardState
+    {
+        public GuardState(int robotId, string weaponId, HexCoord post, int hitPoints)
+        {
+            RobotId = robotId;
+            WeaponId = weaponId;
+            Post = post;
+            Position = post;
+            HitPoints = hitPoints;
+        }
+
+        public int RobotId { get; }
+
+        public string WeaponId { get; }
+
+        public HexCoord Post { get; }
+
+        public HexCoord Position { get; set; }
+
+        public int HitPoints { get; set; }
+
+        public GuardInfo ToInfo() => new GuardInfo(RobotId, WeaponId, Post, Position, HitPoints);
+    }
+
     internal sealed class RobotState
     {
         public RobotState(int robotId, string weaponId, HexCoord position, int hitPoints, int movementPointsLeft)
@@ -61,6 +86,9 @@ namespace Flagstorm.Core.Rules
         public HashSet<HexCoord> Flags { get; } = new HashSet<HexCoord>();
 
         public Dictionary<HexCoord, DefenseState> Defenses { get; } = new Dictionary<HexCoord, DefenseState>();
+
+        // Defensores de este bando, en su isla; comparten el contador de ids con los robots de ataque.
+        public List<GuardState> Guards { get; } = new List<GuardState>();
 
         public HashSet<HexCoord> RevealedEnemyCells { get; } = new HashSet<HexCoord>();
 

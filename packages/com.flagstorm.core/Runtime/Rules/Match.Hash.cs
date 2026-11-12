@@ -38,6 +38,19 @@ namespace Flagstorm.Core.Rules
                     Append(text, "defense", defenseText);
                 }
 
+                foreach (var guard in state.Guards.OrderBy(g => g.RobotId))
+                {
+                    var guardText = string.Format(
+                        CultureInfo.InvariantCulture,
+                        "{0}:{1}:{2}:{3}:{4}",
+                        guard.RobotId,
+                        guard.WeaponId,
+                        guard.Post,
+                        guard.Position,
+                        guard.HitPoints);
+                    Append(text, "guard", guardText);
+                }
+
                 foreach (var robot in state.Robots.OrderBy(r => r.RobotId))
                 {
                     var robotText = string.Format(

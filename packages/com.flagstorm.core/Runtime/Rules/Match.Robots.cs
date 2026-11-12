@@ -29,6 +29,11 @@ namespace Flagstorm.Core.Rules
                 return CommandResult.Rejected(RejectionReason.CellOccupied);
             }
 
+            if (enemy.Guards.Any(g => g.Position == command.LandingCell))
+            {
+                return CommandResult.Rejected(RejectionReason.CellOccupied);
+            }
+
             var reason = CheckWeapon(side, command.WeaponId, WeaponCategory.Capture, out var robot);
             if (reason != RejectionReason.None)
             {
@@ -61,7 +66,7 @@ namespace Flagstorm.Core.Rules
             }
 
             var definition = _arsenal[robot.WeaponId];
-            if (!IsWalkable(enemy.Island, robot.Position, command.Path)
+            if (!IsWalkable(enemy, robot.Position, command.Path)
                 || PathFinder.PathCost(enemy.Island, definition, command.Path) > robot.MovementPointsLeft)
             {
                 return CommandResult.Rejected(RejectionReason.InvalidPath);
@@ -108,7 +113,7 @@ namespace Flagstorm.Core.Rules
             return false;
         }
 
-        private static bool IsWalkable(IslandMap island, HexCoord start, IReadOnlyList<HexCoord> path)
+        private static bool IsWalkable(SideState enemy, HexCoord start, IReadOnlyList<HexCoord> path)
         {
             if (path == null || path.Count == 0)
             {
@@ -118,7 +123,8 @@ namespace Flagstorm.Core.Rules
             var previous = start;
             foreach (var cell in path)
             {
-                if (!island.Contains(cell) || previous.DistanceTo(cell) != 1)
+                if (!enemy.Island.Contains(cell) || enemy.Guards.Any(g => g.Position == cell)
+                    || previous.DistanceTo(cell) != 1)
                 {
                     return false;
                 }
