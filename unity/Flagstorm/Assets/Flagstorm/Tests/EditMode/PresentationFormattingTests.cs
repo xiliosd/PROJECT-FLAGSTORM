@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using Flagstorm.Core.Arsenal;
 using Flagstorm.Core.Map;
 using Flagstorm.Core.Rules;
 using NUnit.Framework;
@@ -49,8 +51,11 @@ namespace Flagstorm.Presentation.Tests
         public void CaptureEvent_TextDependsOnViewer()
         {
             var captured = new FlagCaptured(Side.Blue, new HexCoord(1, 1), 3);
-            Assert.That(EventTextFormatter.Format(captured, Side.Blue, 5), Is.EqualTo("¡Capturaste una bandera! (3/5)"));
-            Assert.That(EventTextFormatter.Format(captured, Side.Red, 5), Is.EqualTo("El rival capturó una de tus banderas (3/5)"));
+            Assert.That(
+                EventTextFormatter.Format(captured, Side.Blue, 5), Is.EqualTo("¡Capturaste una bandera! (3/5)"));
+            Assert.That(
+                EventTextFormatter.Format(captured, Side.Red, 5),
+                Is.EqualTo("El rival capturó una de tus banderas (3/5)"));
         }
 
         [Test]
@@ -77,11 +82,37 @@ namespace Flagstorm.Presentation.Tests
             };
             foreach (var matchEvent in events)
             {
-                Assert.That(EventTextFormatter.Format(matchEvent, Side.Blue, 5), Is.Not.Null, matchEvent.GetType().Name);
+                var text = EventTextFormatter.Format(matchEvent, Side.Blue, 5);
+                Assert.That(text, Is.Not.Null, matchEvent.GetType().Name);
             }
 
             // La energía ya se ve en el HUD; no ensucia el registro.
             Assert.That(EventTextFormatter.Format(new EnergyChanged(Side.Blue, 4), Side.Blue, 5), Is.Null);
+        }
+
+        [Test]
+        public void Hint_DuringSetupCountsPendingFlags()
+        {
+            var session = MatchSession.CreateDefault(3);
+            session.TapOwnCell(session.View.OwnIsland.InteriorCells[0]);
+
+            Assert.That(HintTextFormatter.Format(session), Does.Contain("banderas 1/5"));
+        }
+
+        [Test]
+        public void Hint_FollowsTheSelectedWeapon()
+        {
+            var session = MatchSession.CreateDefault(3);
+            foreach (var cell in session.View.OwnIsland.InteriorCells.Take(5))
+            {
+                session.TapOwnCell(cell);
+            }
+
+            session.ConfirmSetup();
+            Assert.That(HintTextFormatter.Format(session), Does.Contain("Elige un arma"));
+
+            session.SelectWeapon(PrototypeArsenal.Drone);
+            Assert.That(HintTextFormatter.Format(session), Does.Contain("dron"));
         }
     }
 }

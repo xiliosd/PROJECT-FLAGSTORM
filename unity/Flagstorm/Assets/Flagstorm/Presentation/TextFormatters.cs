@@ -62,7 +62,8 @@ namespace Flagstorm.Presentation
                         ? $"Disparaste: {NameOf(impact.WeaponId)}"
                         : $"¡Impacto rival en tu isla! ({NameOf(impact.WeaponId)})";
                 case DefenseDamaged damaged:
-                    return $"{Owner(damaged.Owner, viewer)} {NameOf(damaged.WeaponId)} quedó con {damaged.RemainingHitPoints} PV";
+                    return $"{Owner(damaged.Owner, viewer)} {NameOf(damaged.WeaponId)} "
+                        + $"quedó con {damaged.RemainingHitPoints} PV";
                 case DefenseDestroyed destroyed:
                     return $"{Owner(destroyed.Owner, viewer)} {NameOf(destroyed.WeaponId)} fue destruida";
                 case RobotDeployed deployed:
@@ -109,6 +110,51 @@ namespace Flagstorm.Presentation
             }
 
             return weaponId;
+        }
+    }
+
+    public static class HintTextFormatter
+    {
+        // Indica el siguiente paso posible: el prototipo no tiene tutorial, así que la pista lo reemplaza.
+        public static string Format(MatchSession session)
+        {
+            var match = session.Match;
+            if (match.Phase == MatchPhase.Setup)
+            {
+                return $"Toca tu isla (abajo) para esconder banderas {session.PendingFlags.Count}/"
+                    + $"{match.Rules.FlagsPerSide} y luego poner torretas {session.PendingTurrets.Count}/"
+                    + $"{match.Rules.InitialFreeTurrets}. Después pulsa «Confirmar banderas».";
+            }
+
+            if (match.Phase == MatchPhase.Finished)
+            {
+                return "La partida terminó";
+            }
+
+            if (session.IsAiTurn)
+            {
+                return "El rival está jugando…";
+            }
+
+            if (session.SelectedRobotId.HasValue)
+            {
+                return "Toca una casilla de la isla rival para mover el robot";
+            }
+
+            var weapon = session.WeaponById(session.SelectedWeaponId);
+            switch (weapon?.Category)
+            {
+                case WeaponCategory.Reveal:
+                    return "Toca la isla rival (arriba) para lanzar el dron";
+                case WeaponCategory.Destroy:
+                    return "Toca la isla rival (arriba) para disparar el misil";
+                case WeaponCategory.Capture:
+                    return "Toca una casilla de la costa rival para desembarcar";
+                case WeaponCategory.Defend:
+                    return "Toca una casilla libre de tu isla para construir";
+                default:
+                    return "Elige un arma abajo o toca uno de tus robots";
+            }
         }
     }
 }

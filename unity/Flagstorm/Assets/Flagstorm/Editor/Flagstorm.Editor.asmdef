@@ -1,0 +1,19 @@
+{
+  "name": "Flagstorm.Editor",
+  "rootNamespace": "Flagstorm.EditorTools",
+  "references": [
+    "Flagstorm.Core",
+    "Flagstorm.Presentation"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}
