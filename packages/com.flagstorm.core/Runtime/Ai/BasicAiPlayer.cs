@@ -234,7 +234,9 @@ namespace Flagstorm.Core.Ai
 
         private IMatchCommand TryDefend(PlayerView view, IReadOnlyList<WeaponDefinition> arsenal)
         {
-            var occupied = new HashSet<HexCoord>(view.OwnFlags.Concat(view.OwnDecoys).Concat(view.OwnTurrets.Keys));
+            var occupied = new HashSet<HexCoord>(view.OwnFlags.Concat(view.OwnDefenses.Keys)
+                .Concat(view.OwnGuards.Select(g => g.Position))
+                .Concat(view.EnemyRobotsOnOwnIsland.Select(r => r.Position)));
             var free = view.OwnIsland.Cells.Keys
                 .Where(c => !occupied.Contains(c))
                 .OrderBy(c => c, CellOrder.Instance)

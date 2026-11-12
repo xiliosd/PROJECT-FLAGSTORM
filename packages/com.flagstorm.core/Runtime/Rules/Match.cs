@@ -266,9 +266,7 @@ namespace Flagstorm.Core.Rules
             var allowed = setup.FreeDefenses.All(
                 p => state.Loadout.Contains(p.WeaponId)
                     && _arsenal.TryGetValue(p.WeaponId, out var weapon)
-                    && weapon.Category != WeaponCategory.Capture
-                    && weapon.Category != WeaponCategory.Reveal
-                    && weapon.Category != WeaponCategory.Destroy);
+                    && (weapon.Category == WeaponCategory.Defend || weapon.Category == WeaponCategory.Guard));
             var island = state.Island;
             var all = setup.Flags.Concat(setup.FreeDefenses.Select(p => p.Cell)).ToList();
             return allowed

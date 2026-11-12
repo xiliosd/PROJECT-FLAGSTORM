@@ -98,6 +98,38 @@ namespace Flagstorm.Core.Tests.Rules
         }
 
         [Test]
+        public void BuildGuard_OnEnemyAttackRobotCell_IsRejected()
+        {
+            var match = MatchBuilder.NewPlaying();
+            match.Submit(Side.Blue, new DeployRobotCommand(PrototypeArsenal.JungleRobot, new HexCoord(1, 4)));
+            match.Submit(Side.Blue, new EndTurnCommand());
+            var energy = match.EnergyOf(Side.Red);
+            var result = match.Submit(
+                Side.Red, new BuildDefenseCommand(PrototypeArsenal.BeachGuard, new HexCoord(1, 4)));
+            Assert.That(result.Reason, Is.EqualTo(RejectionReason.CellOccupied));
+            Assert.That(match.EnergyOf(Side.Red), Is.EqualTo(energy));
+        }
+
+        [Test]
+        public void BuildDefense_OnOwnGuardCell_IsRejected()
+        {
+            var match = MatchBuilder.NewPlaying();
+            match.Submit(Side.Blue, new BuildDefenseCommand(PrototypeArsenal.BeachGuard, GuardCell));
+            var result = match.Submit(Side.Blue, new BuildDefenseCommand(PrototypeArsenal.Turret, GuardCell));
+            Assert.That(result.Reason, Is.EqualTo(RejectionReason.CellOccupied));
+        }
+
+        [Test]
+        public void BuildDefense_OnEnemyAttackRobotCell_IsRejected()
+        {
+            var match = MatchBuilder.NewPlaying();
+            match.Submit(Side.Blue, new DeployRobotCommand(PrototypeArsenal.JungleRobot, new HexCoord(1, 4)));
+            match.Submit(Side.Blue, new EndTurnCommand());
+            var result = match.Submit(Side.Red, new BuildDefenseCommand(PrototypeArsenal.Turret, new HexCoord(1, 4)));
+            Assert.That(result.Reason, Is.EqualTo(RejectionReason.CellOccupied));
+        }
+
+        [Test]
         public void StateHash_ChangesWhenGuardIsPlaced()
         {
             var first = MatchBuilder.NewPlaying();

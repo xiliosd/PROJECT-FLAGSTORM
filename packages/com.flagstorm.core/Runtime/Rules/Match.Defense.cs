@@ -16,7 +16,7 @@ namespace Flagstorm.Core.Rules
                 return CommandResult.Rejected(RejectionReason.OutOfIsland);
             }
 
-            if (own.Flags.Contains(command.Cell) || own.Defenses.ContainsKey(command.Cell))
+            if (!IsCellFreeForBuilding(side, command.Cell))
             {
                 return CommandResult.Rejected(RejectionReason.CellOccupied);
             }

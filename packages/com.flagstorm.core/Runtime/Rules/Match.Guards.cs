@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using Flagstorm.Core.Arsenal;
+using Flagstorm.Core.Map;
 
 namespace Flagstorm.Core.Rules
 {
@@ -12,6 +13,16 @@ namespace Flagstorm.Core.Rules
             && _arsenal.TryGetValue(weaponId, out var weapon)
             && weapon.Category == WeaponCategory.Guard;
 
+        // Dos unidades nunca comparten celda: bandera, defensa, defensor o robot de ataque rival la ocupan.
+        private bool IsCellFreeForBuilding(Side side, HexCoord cell)
+        {
+            var own = _sides[side];
+            return !own.Flags.Contains(cell)
+                && !own.Defenses.ContainsKey(cell)
+                && !own.Guards.Any(g => g.Position == cell)
+                && !_sides[side.Opponent()].Robots.Any(r => r.Position == cell);
+        }
+
         private CommandResult ApplyPlaceGuard(Side side, BuildDefenseCommand command)
         {
             var own = _sides[side];
@@ -20,8 +31,7 @@ namespace Flagstorm.Core.Rules
                 return CommandResult.Rejected(RejectionReason.OutOfIsland);
             }
 
-            if (own.Flags.Contains(command.Cell) || own.Defenses.ContainsKey(command.Cell)
-                || own.Guards.Any(g => g.Position == command.Cell))
+            if (!IsCellFreeForBuilding(side, command.Cell))
             {
                 return CommandResult.Rejected(RejectionReason.CellOccupied);
             }
