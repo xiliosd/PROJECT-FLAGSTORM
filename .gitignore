@@ -12,3 +12,4 @@ unity/Flagstorm/[Uu]ser[Ss]ettings/
 unity/Flagstorm/*.csproj
 unity/Flagstorm/*.sln
 unity/Flagstorm/*.slnx
+unity/Flagstorm/.utmp/
