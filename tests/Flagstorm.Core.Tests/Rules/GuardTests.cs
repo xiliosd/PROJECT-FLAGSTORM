@@ -76,7 +76,8 @@ namespace Flagstorm.Core.Tests.Rules
             match.Submit(Side.Blue, new EndTurnCommand());
             match.Submit(Side.Red, new BuildDefenseCommand(PrototypeArsenal.BeachGuard, GuardCell));
             match.Submit(Side.Red, new EndTurnCommand());
-            var deploy = match.Submit(Side.Blue, new DeployRobotCommand(PrototypeArsenal.JungleRobot, new HexCoord(1, 4)));
+            var deploy = match.Submit(
+                Side.Blue, new DeployRobotCommand(PrototypeArsenal.JungleRobot, new HexCoord(1, 4)));
             var robotId = deploy.Events.OfType<RobotDeployed>().Single().RobotId;
             var result = match.Submit(
                 Side.Blue, new MoveRobotCommand(robotId, new[] { GuardCell, new HexCoord(1, 2) }));
