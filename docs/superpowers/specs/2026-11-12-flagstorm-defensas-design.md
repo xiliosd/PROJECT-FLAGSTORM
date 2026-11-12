@@ -2,7 +2,7 @@
 
 - **Fecha:** 2026-11-12
 - **Autor:** Oscar Dueñas (con asistencia de Claude Code)
-- **Estado:** borrador para aprobación de Oscar
+- **Estado:** aprobado por Oscar (2026-11-12)
 - **Base:** `docs/superpowers/specs/2026-11-09-flagstorm-design.md` (diseño general) y el prototipo de la
   etapa 1 (tareas 1 a 11 completas).
 
