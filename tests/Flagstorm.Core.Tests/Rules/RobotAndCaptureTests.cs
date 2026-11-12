@@ -14,7 +14,7 @@ namespace Flagstorm.Core.Tests.Rules
         {
             var match = MatchBuilder.NewPlaying();
             var deploy = match.Submit(
-                Side.Blue, new DeployRobotCommand(PrototypeArsenal.TrackedRobot, new HexCoord(0, 1)));
+                Side.Blue, new DeployRobotCommand(PrototypeArsenal.JungleRobot, new HexCoord(0, 1)));
             var robotId = deploy.Events.OfType<RobotDeployed>().Single().RobotId;
             Assert.That(robotId, Is.EqualTo(1));
             Assert.That(match.EnergyOf(Side.Blue), Is.EqualTo(2));

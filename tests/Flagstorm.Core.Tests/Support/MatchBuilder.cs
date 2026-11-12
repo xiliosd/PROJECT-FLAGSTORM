@@ -31,7 +31,7 @@ namespace Flagstorm.Core.Tests.Support
         public static (Match Match, int RobotId) NewPlayingWithBlueRobotAt(HexCoord coast, RulesConfig rules = null)
         {
             var match = NewPlaying(rules);
-            var result = match.Submit(Side.Blue, new DeployRobotCommand(PrototypeArsenal.TrackedRobot, coast));
+            var result = match.Submit(Side.Blue, new DeployRobotCommand(PrototypeArsenal.JungleRobot, coast));
             Assert.That(result.IsAccepted, Is.True, $"despliegue: {result.Reason}");
             return (match, result.Events.OfType<RobotDeployed>().Single().RobotId);
         }

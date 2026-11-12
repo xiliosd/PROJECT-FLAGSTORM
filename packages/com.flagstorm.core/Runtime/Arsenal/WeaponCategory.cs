@@ -6,5 +6,6 @@ namespace Flagstorm.Core.Arsenal
         Destroy,
         Capture,
         Defend,
+        Guard,
     }
 }

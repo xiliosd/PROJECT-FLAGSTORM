@@ -16,6 +16,12 @@ namespace Flagstorm.Core.Arsenal
         IReadOnlyDictionary<TerrainType, int> PowerModifierPercent,
         IReadOnlyDictionary<TerrainType, int> MovementCost)
     {
+        // Categoría de ataque que esta defensa detiene (escudo contra Reveal, antimisiles contra Destroy).
+        public WeaponCategory? Intercepts { get; init; }
+
+        // Victorias necesarias para tener el arma disponible en el arsenal (ArsenalProgression).
+        public int UnlockLevel { get; init; }
+
         public int ModifierPercentOn(TerrainType terrain) =>
             PowerModifierPercent != null && PowerModifierPercent.TryGetValue(terrain, out var percent) ? percent : 0;
 
