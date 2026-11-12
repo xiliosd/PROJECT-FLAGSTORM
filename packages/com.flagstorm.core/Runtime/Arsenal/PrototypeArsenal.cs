@@ -50,8 +50,8 @@ namespace Flagstorm.Core.Arsenal
             Guard(JungleGuard, "Defensor trepador", TerrainType.Jungle, TerrainType.Rock, 2),
             Robot(SnowRobot, "Robot de nieve", TerrainType.Ice, TerrainType.Volcano, 3),
             Guard(SnowGuard, "Defensor de nieve", TerrainType.Ice, TerrainType.Volcano, 3),
-            Robot(TrackedRobot, "Robot de roca", TerrainType.Rock, TerrainType.Jungle, 4),
-            Guard(TrackedGuard, "Defensor de roca", TerrainType.Rock, TerrainType.Jungle, 4),
+            Robot(TrackedRobot, "Robot de orugas", TerrainType.Rock, TerrainType.Jungle, 4),
+            Guard(TrackedGuard, "Defensor de orugas", TerrainType.Rock, TerrainType.Jungle, 4),
             Robot(MagmaRobot, "Robot de magma", TerrainType.Volcano, TerrainType.Ice, 5),
             Guard(MagmaGuard, "Defensor de magma", TerrainType.Volcano, TerrainType.Ice, 5),
             new WeaponDefinition(
