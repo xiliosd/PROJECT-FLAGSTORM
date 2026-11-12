@@ -142,7 +142,9 @@ namespace Flagstorm.Core.Ai
 
         private IMatchCommand TryMissile(PlayerView view, IReadOnlyList<WeaponDefinition> arsenal)
         {
-            var threats = view.KnownEnemyTurrets.Keys
+            var threats = view.KnownEnemyDefenses
+                .Where(d => d.Value.WeaponId == PrototypeArsenal.Turret)
+                .Select(d => d.Key)
                 .Where(t => view.OwnRobots.Any(r => r.Position.DistanceTo(t) <= 2)
                     || view.EnemySignals.Any(s => s.DistanceTo(t) <= 1))
                 .OrderBy(t => t, CellOrder.Instance)
@@ -244,7 +246,7 @@ namespace Flagstorm.Core.Ai
 
             var turret = arsenal.FirstOrDefault(
                 w => w.Id == PrototypeArsenal.Turret && w.EnergyCost <= view.Energy);
-            if (turret != null && view.OwnTurrets.Count < MaxTurrets)
+            if (turret != null && CountOwn(view, PrototypeArsenal.Turret) < MaxTurrets)
             {
                 // Primero frenar robots invasores; si no hay, proteger banderas.
                 var near = free
@@ -263,13 +265,16 @@ namespace Flagstorm.Core.Ai
 
             var decoy = arsenal.FirstOrDefault(w => w.Id == PrototypeArsenal.Decoy && w.EnergyCost <= view.Energy);
             var interior = free.Where(view.OwnIsland.InteriorCells.Contains).ToList();
-            if (decoy != null && view.OwnDecoys.Count < MaxDecoys && interior.Count > 0)
+            if (decoy != null && CountOwn(view, PrototypeArsenal.Decoy) < MaxDecoys && interior.Count > 0)
             {
                 return new BuildDefenseCommand(decoy.Id, interior[_random.Next(0, interior.Count)]);
             }
 
             return null;
         }
+
+        private static int CountOwn(PlayerView view, string weaponId) =>
+            view.OwnDefenses.Values.Count(d => d.WeaponId == weaponId);
 
         private IEnumerable<HexCoord> Unrevealed(PlayerView view)
         {

@@ -43,5 +43,14 @@ namespace Flagstorm.Core.Rules
 
     public sealed record TurretFired(Side Owner, HexCoord Turret, int TargetRobotId, int Damage) : IMatchEvent;
 
+    public sealed record DroneShotDown(Side By, HexCoord Target, HexCoord Shield) : IMatchEvent;
+
+    public sealed record MissileIntercepted(
+        Side By, string WeaponId, HexCoord Target, HexCoord AntiMissile, int RemainingHitPoints) : IMatchEvent;
+
+    public sealed record GuardDamaged(Side Owner, int RobotId, int RemainingHitPoints) : IMatchEvent;
+
+    public sealed record GuardDestroyed(Side Owner, int RobotId, HexCoord Cell) : IMatchEvent;
+
     public sealed record RobotDestroyed(Side Owner, int RobotId, HexCoord Cell) : IMatchEvent;
 }

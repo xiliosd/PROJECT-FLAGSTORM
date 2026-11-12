@@ -24,6 +24,18 @@ namespace Flagstorm.Core.Rules
 
             var own = _sides[side];
             own.Energy -= drone.EnergyCost;
+            var shield = FindInterceptor(enemy, command.Target, drone.Category);
+            if (shield != null)
+            {
+                // El escudo derriba el dron antes de que revele nada, pero delata su propia celda.
+                own.RevealedEnemyCells.Add(shield.Value.Key);
+                return CommandResult.Accepted(new IMatchEvent[]
+                {
+                    new DroneShotDown(side, command.Target, shield.Value.Key),
+                    new EnergyChanged(side, own.Energy),
+                });
+            }
+
             var cells = LandWithin(enemy.Island, command.Target, drone.Radius);
             own.RevealedEnemyCells.UnionWith(cells);
             return CommandResult.Accepted(new IMatchEvent[]
@@ -50,6 +62,13 @@ namespace Flagstorm.Core.Rules
 
             var own = _sides[side];
             own.Energy -= missile.EnergyCost;
+            var antiMissile = FindInterceptor(enemy, command.Target, missile.Category);
+            if (antiMissile != null)
+            {
+                return CommandResult.Accepted(
+                    InterceptMissile(side, enemySide, missile, command.Target, antiMissile.Value));
+            }
+
             var cells = LandWithin(enemy.Island, command.Target, missile.Radius);
             var events = new List<IMatchEvent> { new MissileImpact(side, missile.Id, command.Target, cells) };
 
@@ -75,8 +94,71 @@ namespace Flagstorm.Core.Rules
                 }
             }
 
+            // Los defensores en el área también reciben el daño; los robots del atacante nunca.
+            foreach (var guard in enemy.Guards.Where(g => cells.Contains(g.Position)).OrderBy(g => g.RobotId).ToList())
+            {
+                guard.HitPoints -= missile.EffectivePowerOn(enemy.Island.TerrainAt(guard.Position));
+                if (guard.HitPoints <= 0)
+                {
+                    enemy.Guards.Remove(guard);
+                    events.Add(new GuardDestroyed(enemySide, guard.RobotId, guard.Position));
+                }
+                else
+                {
+                    events.Add(new GuardDamaged(enemySide, guard.RobotId, guard.HitPoints));
+                }
+            }
+
             events.Add(new EnergyChanged(side, own.Energy));
             return CommandResult.Accepted(events);
+        }
+
+        private List<IMatchEvent> InterceptMissile(
+            Side side,
+            Side enemySide,
+            WeaponDefinition missile,
+            HexCoord target,
+            KeyValuePair<HexCoord, DefenseState> antiMissile)
+        {
+            var own = _sides[side];
+            var defense = antiMissile.Value;
+            defense.HitPoints -= 1;
+            own.RevealedEnemyCells.Add(antiMissile.Key);
+            var events = new List<IMatchEvent>
+            {
+                new MissileIntercepted(side, missile.Id, target, antiMissile.Key, defense.HitPoints),
+            };
+            if (defense.HitPoints <= 0)
+            {
+                _sides[enemySide].Defenses.Remove(antiMissile.Key);
+                events.Add(new DefenseDestroyed(enemySide, antiMissile.Key, defense.WeaponId));
+            }
+
+            events.Add(new EnergyChanged(side, own.Energy));
+            return events;
+        }
+
+        // Gana la defensa más cercana al objetivo y, a igual distancia, la primera en CellOrder.
+        private KeyValuePair<HexCoord, DefenseState>? FindInterceptor(
+            SideState enemy, HexCoord target, WeaponCategory incoming)
+        {
+            KeyValuePair<HexCoord, DefenseState>? best = null;
+            foreach (var defense in enemy.Defenses.OrderBy(d => d.Key, CellOrder.Instance))
+            {
+                var weapon = _arsenal[defense.Value.WeaponId];
+                var distance = defense.Key.DistanceTo(target);
+                if (weapon.Intercepts != incoming || distance > weapon.Radius)
+                {
+                    continue;
+                }
+
+                if (best == null || distance < best.Value.Key.DistanceTo(target))
+                {
+                    best = defense;
+                }
+            }
+
+            return best;
         }
 
         private static IReadOnlyList<HexCoord> LandWithin(IslandMap island, HexCoord center, int radius) =>

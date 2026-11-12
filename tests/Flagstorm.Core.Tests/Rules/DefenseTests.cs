@@ -48,7 +48,7 @@ namespace Flagstorm.Core.Tests.Rules
             var result = match.Submit(Side.Blue, new BuildDefenseCommand(PrototypeArsenal.Turret, new HexCoord(1, 3)));
             Assert.That(result.Events.OfType<DefenseBuilt>().Single().Cell, Is.EqualTo(new HexCoord(1, 3)));
             Assert.That(match.EnergyOf(Side.Blue), Is.EqualTo(3));
-            Assert.That(match.ViewFor(Side.Blue).OwnTurrets[new HexCoord(1, 3)], Is.EqualTo(4));
+            Assert.That(match.ViewFor(Side.Blue).OwnDefenses[new HexCoord(1, 3)].HitPoints, Is.EqualTo(4));
         }
 
         [Test]
@@ -57,7 +57,7 @@ namespace Flagstorm.Core.Tests.Rules
             var match = MatchBuilder.NewPlaying();
             match.Submit(Side.Blue, new EndTurnCommand());
             match.Submit(Side.Red, new BuildDefenseCommand(PrototypeArsenal.Decoy, new HexCoord(1, 3)));
-            Assert.That(match.ViewFor(Side.Red).OwnDecoys, Is.EquivalentTo(new[] { new HexCoord(1, 3) }));
+            Assert.That(match.ViewFor(Side.Red).OwnDefenses.Keys, Does.Contain(new HexCoord(1, 3)));
             match.Submit(Side.Red, new EndTurnCommand());
 
             match.Submit(Side.Blue, new LaunchDroneCommand(PrototypeArsenal.Drone, new HexCoord(1, 3)));

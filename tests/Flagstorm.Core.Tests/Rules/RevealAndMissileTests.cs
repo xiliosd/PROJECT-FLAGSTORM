@@ -15,7 +15,7 @@ namespace Flagstorm.Core.Tests.Rules
             var view = MatchBuilder.NewPlaying().ViewFor(Side.Blue);
             Assert.That(view.RevealedEnemyCells, Is.Empty);
             Assert.That(view.EnemySignals, Is.Empty);
-            Assert.That(view.KnownEnemyTurrets, Is.Empty);
+            Assert.That(view.KnownEnemyDefenses, Is.Empty);
             Assert.That(view.OwnFlags, Is.EquivalentTo(MatchBuilder.DefaultFlags));
         }
 
@@ -32,7 +32,7 @@ namespace Flagstorm.Core.Tests.Rules
             Assert.That(
                 view.EnemySignals,
                 Is.EquivalentTo(new[] { new HexCoord(1, 1), new HexCoord(2, 1), new HexCoord(1, 2) }));
-            Assert.That(view.KnownEnemyTurrets.Keys, Is.EquivalentTo(new[] { new HexCoord(0, 2) }));
+            Assert.That(view.KnownEnemyDefenses.Keys, Is.EquivalentTo(new[] { new HexCoord(0, 2) }));
             Assert.That(match.EnergyOf(Side.Blue), Is.EqualTo(4));
         }
 
@@ -55,7 +55,7 @@ namespace Flagstorm.Core.Tests.Rules
             var onJungle = match.Submit(
                 Side.Blue, new FireMissileCommand(PrototypeArsenal.IncendiaryMissile, new HexCoord(0, 2)));
             Assert.That(onJungle.Events.OfType<DefenseDestroyed>().Single().Cell, Is.EqualTo(new HexCoord(0, 2)));
-            Assert.That(match.ViewFor(Side.Red).OwnTurrets.Keys, Is.EquivalentTo(new[] { new HexCoord(3, 1) }));
+            Assert.That(match.ViewFor(Side.Red).OwnDefenses.Keys, Is.EquivalentTo(new[] { new HexCoord(3, 1) }));
         }
 
         [Test]

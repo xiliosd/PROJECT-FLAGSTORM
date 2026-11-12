@@ -97,11 +97,9 @@ namespace Flagstorm.Core.Rules
                 OwnFlags = Sorted(own.Flags),
                 OwnGuards = own.Guards.OrderBy(g => g.RobotId).Select(g => g.ToInfo()).ToList(),
                 KnownEnemyGuards = KnownGuardsOf(own, enemy),
-                OwnDecoys = Sorted(DefenseCells(own, PrototypeArsenal.Decoy)),
-                OwnTurrets = TurretsIn(own, own.Defenses.Keys),
+                KnownEnemyDefenses = KnownDefensesOf(own, enemy),
                 RevealedEnemyCells = Sorted(own.RevealedEnemyCells),
                 EnemySignals = Sorted(own.RevealedEnemyCells.Where(c => IsSignal(enemy, c))),
-                KnownEnemyTurrets = TurretsIn(enemy, own.RevealedEnemyCells),
                 OwnRobots = own.Robots.OrderBy(r => r.RobotId).Select(r => r.ToInfo()).ToList(),
                 EnemyRobotsOnOwnIsland = enemy.Robots.OrderBy(r => r.RobotId).Select(r => r.ToInfo()).ToList(),
                 FlagsCapturedByViewer = own.FlagsCaptured,
@@ -118,9 +116,6 @@ namespace Flagstorm.Core.Rules
         private static IReadOnlyList<HexCoord> Sorted(IEnumerable<HexCoord> cells) =>
             cells.OrderBy(c => c.R).ThenBy(c => c.Q).ToList();
 
-        private static IEnumerable<HexCoord> DefenseCells(SideState side, string weaponId) =>
-            side.Defenses.Where(d => d.Value.WeaponId == weaponId).Select(d => d.Key);
-
         private static bool IsSignal(SideState owner, HexCoord cell) =>
             owner.Flags.Contains(cell)
             || (owner.Defenses.TryGetValue(cell, out var defense) && defense.WeaponId == PrototypeArsenal.Decoy);
@@ -136,14 +131,15 @@ namespace Flagstorm.Core.Rules
             return result;
         }
 
-        private static IReadOnlyDictionary<HexCoord, int> TurretsIn(SideState owner, IEnumerable<HexCoord> visible)
+        // Un señuelo se hace pasar por bandera: nunca se expone como defensa, ni siquiera en una celda revelada.
+        private static IReadOnlyDictionary<HexCoord, DefenseInfo> KnownDefensesOf(SideState viewer, SideState owner)
         {
-            var result = new SortedDictionary<HexCoord, int>(CellOrder.Instance);
-            foreach (var cell in visible)
+            var result = new SortedDictionary<HexCoord, DefenseInfo>(CellOrder.Instance);
+            foreach (var cell in viewer.RevealedEnemyCells)
             {
-                if (owner.Defenses.TryGetValue(cell, out var defense) && defense.WeaponId == PrototypeArsenal.Turret)
+                if (owner.Defenses.TryGetValue(cell, out var defense) && defense.WeaponId != PrototypeArsenal.Decoy)
                 {
-                    result[cell] = defense.HitPoints;
+                    result[cell] = new DefenseInfo(defense.WeaponId, defense.HitPoints);
                 }
             }
 

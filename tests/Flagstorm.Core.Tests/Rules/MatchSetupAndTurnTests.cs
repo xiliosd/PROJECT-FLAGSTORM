@@ -95,8 +95,8 @@ namespace Flagstorm.Core.Tests.Rules
             Assert.That(view.Viewer, Is.EqualTo(Side.Blue));
             Assert.That(view.Energy, Is.EqualTo(6));
             Assert.That(view.OwnFlags, Is.EquivalentTo(MatchBuilder.DefaultFlags));
-            Assert.That(view.OwnTurrets.Keys, Is.EquivalentTo(MatchBuilder.DefaultTurrets));
-            Assert.That(view.OwnTurrets.Values, Is.All.EqualTo(4));
+            Assert.That(view.OwnDefenses.Keys, Is.EquivalentTo(MatchBuilder.DefaultTurrets));
+            Assert.That(view.OwnDefenses.Values.Select(d => d.HitPoints), Is.All.EqualTo(4));
         }
 
         private static readonly string[] StarterLoadout =

@@ -60,7 +60,7 @@ namespace Flagstorm.Core.Tests.Rules
             Assert.That(missile.Events.OfType<DefenseDestroyed>(), Is.Empty);
             Assert.That(missile.Events.OfType<DefenseDamaged>(), Is.Empty);
             Assert.That(match.ViewFor(Side.Blue).EnemySignals, Does.Contain(new HexCoord(1, 3)));
-            Assert.That(match.ViewFor(Side.Red).OwnDecoys, Does.Contain(new HexCoord(1, 3)));
+            Assert.That(match.ViewFor(Side.Red).OwnDefenses.Keys, Does.Contain(new HexCoord(1, 3)));
         }
     }
 }

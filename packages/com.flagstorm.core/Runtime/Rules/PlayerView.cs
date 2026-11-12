@@ -41,16 +41,13 @@ namespace Flagstorm.Core.Rules
         // Defensores rivales en celdas reveladas o a distancia 1 o menos de un robot propio.
         public IReadOnlyList<GuardInfo> KnownEnemyGuards { get; internal set; }
 
-        public IReadOnlyCollection<HexCoord> OwnDecoys { get; internal set; }
-
-        public IReadOnlyDictionary<HexCoord, int> OwnTurrets { get; internal set; }
+        // Defensas rivales en celdas reveladas, ordenadas por CellOrder; nunca incluye señuelos.
+        public IReadOnlyDictionary<HexCoord, DefenseInfo> KnownEnemyDefenses { get; internal set; }
 
         public IReadOnlyCollection<HexCoord> RevealedEnemyCells { get; internal set; }
 
         // Banderas y señuelos en celdas reveladas, sin distinguir cuál es cuál.
         public IReadOnlyCollection<HexCoord> EnemySignals { get; internal set; }
-
-        public IReadOnlyDictionary<HexCoord, int> KnownEnemyTurrets { get; internal set; }
 
         public IReadOnlyList<RobotInfo> OwnRobots { get; internal set; }
 
