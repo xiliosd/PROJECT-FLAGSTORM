@@ -48,18 +48,23 @@ namespace Flagstorm.Core.Ai
                 candidates.Remove(pick);
             }
 
-            var turretCells = candidates
+            var defenseCells = candidates
                 .Where(c => flags.Any(f => f.DistanceTo(c) == 1))
                 .ToList();
-            var turrets = new List<HexCoord>();
-            while (turrets.Count < rules.InitialFreeTurrets && turretCells.Count > 0)
+            var defenses = new List<DefensePlacement>();
+            foreach (var weaponId in FreeDefenseWeaponIds(view.Loadout, rules.InitialFreeDefenses))
             {
-                var pick = turretCells[_random.Next(0, turretCells.Count)];
-                turrets.Add(pick);
-                turretCells.Remove(pick);
+                if (defenseCells.Count == 0)
+                {
+                    break;
+                }
+
+                var pick = defenseCells[_random.Next(0, defenseCells.Count)];
+                defenses.Add(new DefensePlacement(weaponId, pick));
+                defenseCells.Remove(pick);
             }
 
-            return new SetupCommand(flags, turrets);
+            return new SetupCommand(flags, defenses);
         }
 
         public IMatchCommand NextCommand(PlayerView view, IReadOnlyList<WeaponDefinition> arsenal)
@@ -85,6 +90,22 @@ namespace Flagstorm.Core.Ai
                 ?? TryDrone(view, arsenal)
                 ?? TryDefend(view, arsenal)
                 ?? (IMatchCommand)new EndTurnCommand();
+        }
+
+        // Torretas como siempre si el arsenal las trae; si no, las primeras defensas del arsenal por orden,
+        // para que la IA siga siendo determinista.
+        private static IReadOnlyList<string> FreeDefenseWeaponIds(IReadOnlyList<string> loadout, int count)
+        {
+            var ids = loadout ?? new string[0];
+            if (ids.Contains(PrototypeArsenal.Turret))
+            {
+                return Enumerable.Repeat(PrototypeArsenal.Turret, count).ToList();
+            }
+
+            return ids
+                .Where(id => PrototypeArsenal.All.Any(w => w.Id == id && w.Category == WeaponCategory.Defend))
+                .Take(count)
+                .ToList();
         }
 
         private IMatchCommand TryMoveRobot(PlayerView view, IReadOnlyList<WeaponDefinition> arsenal)

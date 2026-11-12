@@ -38,7 +38,7 @@ namespace Flagstorm.Core.Tests.Rules
             {
                 new HexCoord(0, 1), new HexCoord(2, 1), new HexCoord(1, 2), new HexCoord(2, 2), new HexCoord(0, 3),
             };
-            match.Submit(Side.Red, new SetupCommand(coastFlags, MatchBuilder.DefaultTurrets));
+            match.Submit(Side.Red, new SetupCommand(coastFlags, MatchBuilder.DefaultFreeDefenses));
 
             var result = match.Submit(
                 Side.Blue, new DeployRobotCommand(PrototypeArsenal.TrackedRobot, new HexCoord(0, 1)));

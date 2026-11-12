@@ -8,7 +8,10 @@ namespace Flagstorm.Core.Rules
     {
     }
 
-    public sealed record SetupCommand(IReadOnlyList<HexCoord> Flags, IReadOnlyList<HexCoord> Turrets) : IMatchCommand;
+    public sealed record DefensePlacement(string WeaponId, HexCoord Cell);
+
+    public sealed record SetupCommand(
+        IReadOnlyList<HexCoord> Flags, IReadOnlyList<DefensePlacement> FreeDefenses) : IMatchCommand;
 
     public sealed record LaunchDroneCommand(string WeaponId, HexCoord Target) : IMatchCommand;
 

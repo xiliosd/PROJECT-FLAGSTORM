@@ -43,10 +43,14 @@ namespace Flagstorm.Core.Rules
     // Estado de un bando: su isla, lo que esconde y defiende, y lo que sabe y tiene en la isla rival.
     internal sealed class SideState
     {
-        public SideState(IslandMap island)
+        public SideState(IslandMap island, IReadOnlyList<string> loadout)
         {
             Island = island;
+            Loadout = loadout;
         }
+
+        // Armas que este bando eligió llevar; solo con ellas puede actuar en la partida.
+        public IReadOnlyList<string> Loadout { get; }
 
         public IslandMap Island { get; }
 

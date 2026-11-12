@@ -31,6 +31,7 @@ namespace Flagstorm.Core.Rules
         InvalidPath,
         UnknownRobot,
         CellOccupied,
+        NotInLoadout,
     }
 
     public static class SideExtensions
@@ -39,7 +40,7 @@ namespace Flagstorm.Core.Rules
     }
 
     // Valores de equilibrio en datos, para ajustarlos con pruebas de juego sin tocar las reglas.
-    public sealed record RulesConfig(int FlagsPerSide, int EnergyPerTurn, int MaxEnergy, int InitialFreeTurrets)
+    public sealed record RulesConfig(int FlagsPerSide, int EnergyPerTurn, int MaxEnergy, int InitialFreeDefenses)
     {
         public static RulesConfig Default => new RulesConfig(5, 6, 10, 2);
     }

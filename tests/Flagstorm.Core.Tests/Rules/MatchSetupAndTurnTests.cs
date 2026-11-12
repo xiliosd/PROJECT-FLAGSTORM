@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Flagstorm.Core.Arsenal;
 using Flagstorm.Core.Map;
 using Flagstorm.Core.Rules;
 using Flagstorm.Core.Tests.Support;
@@ -51,7 +52,7 @@ namespace Flagstorm.Core.Tests.Rules
 
             var match = MatchBuilder.NewPlaying();
             Assert.That(match.Submit(Side.Red, new EndTurnCommand()).Reason, Is.EqualTo(RejectionReason.NotYourTurn));
-            var lateSetup = new SetupCommand(MatchBuilder.DefaultFlags, new HexCoord[0]);
+            var lateSetup = new SetupCommand(MatchBuilder.DefaultFlags, new DefensePlacement[0]);
             Assert.That(match.Submit(Side.Blue, lateSetup).Reason, Is.EqualTo(RejectionReason.WrongPhase));
         }
 
@@ -98,10 +99,73 @@ namespace Flagstorm.Core.Tests.Rules
             Assert.That(view.OwnTurrets.Values, Is.All.EqualTo(4));
         }
 
+        private static readonly string[] StarterLoadout =
+        {
+            PrototypeArsenal.Drone, PrototypeArsenal.DroneShield, PrototypeArsenal.BeachRobot,
+            PrototypeArsenal.BeachGuard,
+        };
+
+        private static Match NewStarterMatch() => new Match(
+            TestIslands.Small(), TestIslands.Small(), RulesConfig.Default, PrototypeArsenal.All,
+            StarterLoadout, StarterLoadout);
+
+        private static SetupCommand SetupWith(params DefensePlacement[] defenses) => new SetupCommand(
+            MatchBuilder.DefaultFlags, defenses);
+
+        [Test]
+        public void Setup_PlacesFreeDefensesFromLoadout()
+        {
+            var match = NewStarterMatch();
+            var cell = new HexCoord(3, 1);
+            var result = match.Submit(Side.Blue, SetupWith(new DefensePlacement(PrototypeArsenal.DroneShield, cell)));
+            Assert.That(result.IsAccepted, Is.True);
+            var defense = match.ViewFor(Side.Blue).OwnDefenses[cell];
+            Assert.That(defense.WeaponId, Is.EqualTo(PrototypeArsenal.DroneShield));
+            Assert.That(defense.HitPoints, Is.EqualTo(3));
+            Assert.That(match.LoadoutOf(Side.Blue), Is.EqualTo(StarterLoadout));
+            Assert.That(match.ViewFor(Side.Blue).Loadout, Is.EqualTo(StarterLoadout));
+        }
+
+        [Test]
+        public void Setup_RejectsFreeDefenseNotInLoadout()
+        {
+            var result = NewStarterMatch().Submit(
+                Side.Blue, SetupWith(new DefensePlacement(PrototypeArsenal.Turret, new HexCoord(3, 1))));
+            Assert.That(result.Reason, Is.EqualTo(RejectionReason.InvalidSetup));
+        }
+
+        [Test]
+        public void Setup_RejectsAttackWeaponAsFreeDefense()
+        {
+            var result = NewStarterMatch().Submit(
+                Side.Blue, SetupWith(new DefensePlacement(PrototypeArsenal.BeachRobot, new HexCoord(3, 1))));
+            Assert.That(result.Reason, Is.EqualTo(RejectionReason.InvalidSetup));
+        }
+
+        [Test]
+        public void Setup_RejectsGuardAsFreeDefense_ForNow()
+        {
+            var result = NewStarterMatch().Submit(
+                Side.Blue, SetupWith(new DefensePlacement(PrototypeArsenal.BeachGuard, new HexCoord(3, 1))));
+            Assert.That(result.Reason, Is.EqualTo(RejectionReason.InvalidSetup));
+        }
+
+        [Test]
+        public void Command_WithWeaponOutsideLoadout_IsRejected()
+        {
+            var match = NewStarterMatch();
+            match.Submit(Side.Blue, SetupWith());
+            match.Submit(Side.Red, SetupWith());
+            var energy = match.EnergyOf(Side.Blue);
+            var result = match.Submit(Side.Blue, new FireMissileCommand(PrototypeArsenal.StandardMissile, new HexCoord(1, 1)));
+            Assert.That(result.Reason, Is.EqualTo(RejectionReason.NotInLoadout));
+            Assert.That(match.EnergyOf(Side.Blue), Is.EqualTo(energy));
+        }
+
         private static SetupCommand InvalidSetup(string caseName)
         {
             var flags = MatchBuilder.DefaultFlags.ToList();
-            var turrets = MatchBuilder.DefaultTurrets.ToList();
+            var turrets = MatchBuilder.DefaultFreeDefenses.ToList();
             switch (caseName)
             {
                 case "duplicada":
@@ -114,10 +178,10 @@ namespace Flagstorm.Core.Tests.Rules
                     flags.RemoveAt(4);
                     break;
                 case "torretas":
-                    turrets.Add(new HexCoord(1, 3));
+                    turrets.Add(new DefensePlacement(PrototypeArsenal.Turret, new HexCoord(1, 3)));
                     break;
                 case "torreta-sobre-bandera":
-                    turrets[0] = flags[0];
+                    turrets[0] = new DefensePlacement(PrototypeArsenal.Turret, flags[0]);
                     break;
             }
 

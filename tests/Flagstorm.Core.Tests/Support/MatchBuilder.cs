@@ -16,6 +16,9 @@ namespace Flagstorm.Core.Tests.Support
         public static readonly IReadOnlyList<HexCoord> DefaultTurrets =
             new[] { new HexCoord(3, 1), new HexCoord(0, 2) };
 
+        public static readonly IReadOnlyList<DefensePlacement> DefaultFreeDefenses =
+            DefaultTurrets.Select(cell => new DefensePlacement(PrototypeArsenal.Turret, cell)).ToList();
+
         public static Match NewSetup(RulesConfig rules = null) =>
             new Match(TestIslands.Small(), TestIslands.Small(), rules ?? RulesConfig.Default, PrototypeArsenal.All);
 
@@ -37,6 +40,6 @@ namespace Flagstorm.Core.Tests.Support
         }
 
         public static SetupCommand DefaultSetupFor(RulesConfig rules) =>
-            new SetupCommand(DefaultFlags.Take(rules.FlagsPerSide).ToList(), DefaultTurrets);
+            new SetupCommand(DefaultFlags.Take(rules.FlagsPerSide).ToList(), DefaultFreeDefenses);
     }
 }

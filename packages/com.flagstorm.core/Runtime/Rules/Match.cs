@@ -13,8 +13,20 @@ namespace Flagstorm.Core.Rules
         private readonly Dictionary<string, WeaponDefinition> _arsenal;
         private readonly List<RecordedCommand> _history = new List<RecordedCommand>();
 
+        // Sin loadouts explícitos, ambos bandos disponen del catálogo completo.
         public Match(
-            IslandMap blueIsland, IslandMap redIsland, RulesConfig rules, IReadOnlyList<WeaponDefinition> arsenal)
+            IslandMap blueIsland, IslandMap redIsland, RulesConfig rules, IReadOnlyList<WeaponDefinition> catalog)
+            : this(blueIsland, redIsland, rules, catalog, AllIds(catalog), AllIds(catalog))
+        {
+        }
+
+        public Match(
+            IslandMap blueIsland,
+            IslandMap redIsland,
+            RulesConfig rules,
+            IReadOnlyList<WeaponDefinition> catalog,
+            IReadOnlyList<string> blueLoadout,
+            IReadOnlyList<string> redLoadout)
         {
             if (blueIsland == null || redIsland == null)
             {
@@ -22,11 +34,11 @@ namespace Flagstorm.Core.Rules
             }
 
             Rules = rules ?? throw new ArgumentNullException(nameof(rules));
-            _arsenal = (arsenal ?? throw new ArgumentNullException(nameof(arsenal))).ToDictionary(w => w.Id);
+            _arsenal = (catalog ?? throw new ArgumentNullException(nameof(catalog))).ToDictionary(w => w.Id);
             _sides = new Dictionary<Side, SideState>
             {
-                [Side.Blue] = new SideState(blueIsland),
-                [Side.Red] = new SideState(redIsland),
+                [Side.Blue] = new SideState(blueIsland, CopyLoadout(blueLoadout, nameof(blueLoadout))),
+                [Side.Red] = new SideState(redIsland, CopyLoadout(redLoadout, nameof(redLoadout))),
             };
             Phase = MatchPhase.Setup;
             TurnNumber = 1;
@@ -47,6 +59,8 @@ namespace Flagstorm.Core.Rules
         public int EnergyOf(Side side) => _sides[side].Energy;
 
         public IslandMap IslandOf(Side side) => _sides[side].Island;
+
+        public IReadOnlyList<string> LoadoutOf(Side side) => _sides[side].Loadout;
 
         public CommandResult Submit(Side side, IMatchCommand command)
         {
@@ -78,6 +92,8 @@ namespace Flagstorm.Core.Rules
                 Rules = Rules,
                 OwnIsland = own.Island,
                 EnemyIsland = enemy.Island,
+                Loadout = own.Loadout,
+                OwnDefenses = DefensesIn(own),
                 OwnFlags = Sorted(own.Flags),
                 OwnDecoys = Sorted(DefenseCells(own, PrototypeArsenal.Decoy)),
                 OwnTurrets = TurretsIn(own, own.Defenses.Keys),
@@ -91,6 +107,12 @@ namespace Flagstorm.Core.Rules
             };
         }
 
+        private static IReadOnlyList<string> AllIds(IReadOnlyList<WeaponDefinition> catalog) =>
+            (catalog ?? throw new ArgumentNullException(nameof(catalog))).Select(w => w.Id).ToList();
+
+        private static IReadOnlyList<string> CopyLoadout(IReadOnlyList<string> loadout, string name) =>
+            (loadout ?? throw new ArgumentNullException(name)).ToList();
+
         private static IReadOnlyList<HexCoord> Sorted(IEnumerable<HexCoord> cells) =>
             cells.OrderBy(c => c.R).ThenBy(c => c.Q).ToList();
 
@@ -100,6 +122,17 @@ namespace Flagstorm.Core.Rules
         private static bool IsSignal(SideState owner, HexCoord cell) =>
             owner.Flags.Contains(cell)
             || (owner.Defenses.TryGetValue(cell, out var defense) && defense.WeaponId == PrototypeArsenal.Decoy);
+
+        private static IReadOnlyDictionary<HexCoord, DefenseInfo> DefensesIn(SideState owner)
+        {
+            var result = new SortedDictionary<HexCoord, DefenseInfo>(CellOrder.Instance);
+            foreach (var defense in owner.Defenses)
+            {
+                result[defense.Key] = new DefenseInfo(defense.Value.WeaponId, defense.Value.HitPoints);
+            }
+
+            return result;
+        }
 
         private static IReadOnlyDictionary<HexCoord, int> TurretsIn(SideState owner, IEnumerable<HexCoord> visible)
         {
@@ -168,6 +201,11 @@ namespace Flagstorm.Core.Rules
                 return RejectionReason.UnknownWeapon;
             }
 
+            if (!_sides[side].Loadout.Contains(weaponId))
+            {
+                return RejectionReason.NotInLoadout;
+            }
+
             if (weapon.Category != category)
             {
                 return RejectionReason.WrongCategory;
@@ -179,20 +217,20 @@ namespace Flagstorm.Core.Rules
         private CommandResult ApplySetup(Side side, SetupCommand setup)
         {
             var state = _sides[side];
-            if (state.SetupDone || !IsValidSetup(state.Island, setup))
+            if (state.SetupDone || !IsValidSetup(state, setup))
             {
                 return CommandResult.Rejected(RejectionReason.InvalidSetup);
             }
 
-            var turret = _arsenal[PrototypeArsenal.Turret];
             foreach (var flag in setup.Flags)
             {
                 state.Flags.Add(flag);
             }
 
-            foreach (var cell in setup.Turrets)
+            foreach (var placement in setup.FreeDefenses)
             {
-                state.Defenses[cell] = new DefenseState(turret.Id, turret.HitPoints);
+                var defense = _arsenal[placement.WeaponId];
+                state.Defenses[placement.Cell] = new DefenseState(defense.Id, defense.HitPoints);
             }
 
             state.SetupDone = true;
@@ -208,16 +246,23 @@ namespace Flagstorm.Core.Rules
             return CommandResult.Accepted(events);
         }
 
-        private bool IsValidSetup(IslandMap island, SetupCommand setup)
+        private bool IsValidSetup(SideState state, SetupCommand setup)
         {
-            if (setup.Flags == null || setup.Turrets == null)
+            if (setup.Flags == null || setup.FreeDefenses == null || setup.FreeDefenses.Any(p => p == null))
             {
                 return false;
             }
 
-            var all = setup.Flags.Concat(setup.Turrets).ToList();
-            return setup.Flags.Count == Rules.FlagsPerSide
-                && setup.Turrets.Count <= Rules.InitialFreeTurrets
+            // Hasta que los defensores entren en la preparación (tarea 3), solo se regalan defensas Defend.
+            var allowed = setup.FreeDefenses.All(
+                p => state.Loadout.Contains(p.WeaponId)
+                    && _arsenal.TryGetValue(p.WeaponId, out var weapon)
+                    && weapon.Category == WeaponCategory.Defend);
+            var island = state.Island;
+            var all = setup.Flags.Concat(setup.FreeDefenses.Select(p => p.Cell)).ToList();
+            return allowed
+                && setup.Flags.Count == Rules.FlagsPerSide
+                && setup.FreeDefenses.Count <= Rules.InitialFreeDefenses
                 && all.All(island.Contains)
                 && all.Distinct().Count() == all.Count;
         }
