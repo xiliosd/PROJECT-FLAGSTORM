@@ -51,7 +51,7 @@ namespace Flagstorm.Core.Rules
             };
 
             // Desembarcar justo sobre una bandera o un señuelo cuenta como llegar a esa casilla.
-            ResolveArrival(side, own, enemy, command.LandingCell, events);
+            ResolveArrival(side, own, enemy, command.LandingCell, robot.Id, events);
             return CommandResult.Accepted(events);
         }
 
@@ -79,7 +79,7 @@ namespace Flagstorm.Core.Rules
                 robot.MovementPointsLeft -= definition.MovementCostOn(enemy.Island.TerrainAt(cell));
                 robot.Position = cell;
                 walked.Add(cell);
-                if (ResolveArrival(side, own, enemy, cell, events))
+                if (ResolveArrival(side, own, enemy, cell, robot.WeaponId, events))
                 {
                     break;
                 }
@@ -90,12 +90,13 @@ namespace Flagstorm.Core.Rules
         }
 
         // Devuelve true si la partida terminó: el resto de la ruta ya no importa.
-        private bool ResolveArrival(Side side, SideState own, SideState enemy, HexCoord cell, List<IMatchEvent> events)
+        private bool ResolveArrival(
+            Side side, SideState own, SideState enemy, HexCoord cell, string weaponId, List<IMatchEvent> events)
         {
             if (enemy.Flags.Remove(cell))
             {
                 own.FlagsCaptured++;
-                events.Add(new FlagCaptured(side, cell, own.FlagsCaptured));
+                events.Add(new FlagCaptured(side, cell, own.FlagsCaptured, weaponId));
                 if (own.FlagsCaptured >= Rules.FlagsPerSide)
                 {
                     Phase = MatchPhase.Finished;

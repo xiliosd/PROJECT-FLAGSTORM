@@ -68,6 +68,8 @@ namespace Flagstorm.Core.Rules
                     events.Add(new RobotDestroyed(side, target.RobotId, target.Position));
                 }
             }
+
+            ResolveGuardPhase(side, events);
         }
     }
 }

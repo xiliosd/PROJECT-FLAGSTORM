@@ -31,7 +31,7 @@ namespace Flagstorm.Core.Rules
 
     public sealed record RobotMoved(Side Owner, int RobotId, IReadOnlyList<HexCoord> Path) : IMatchEvent;
 
-    public sealed record FlagCaptured(Side By, HexCoord Cell, int TotalCaptured) : IMatchEvent;
+    public sealed record FlagCaptured(Side By, HexCoord Cell, int TotalCaptured, string WeaponId) : IMatchEvent;
 
     public sealed record DecoyExposed(Side By, HexCoord Cell) : IMatchEvent;
 
@@ -53,4 +53,12 @@ namespace Flagstorm.Core.Rules
     public sealed record GuardDestroyed(Side Owner, int RobotId, HexCoord Cell) : IMatchEvent;
 
     public sealed record RobotDestroyed(Side Owner, int RobotId, HexCoord Cell) : IMatchEvent;
+
+    // Golpes simultáneos entre un robot de ataque y un defensor; cada daño es el que recibe el otro bando.
+    public sealed record RobotsClashed(
+        Side Attacker, int AttackerId, int GuardId, int DamageToGuard, int DamageToAttacker) : IMatchEvent;
+
+    public sealed record GuardMoved(Side Owner, int RobotId, HexCoord From, HexCoord To) : IMatchEvent;
+
+    public sealed record RobotHitDefense(Side Attacker, int RobotId, HexCoord Defense, int Damage) : IMatchEvent;
 }
