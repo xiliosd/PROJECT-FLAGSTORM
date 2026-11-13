@@ -161,11 +161,11 @@ namespace Flagstorm.Presentation.Tests
                 new DefenseDestroyed(Side.Red, cell, PrototypeArsenal.Turret),
             };
 
-            var visible = EventVisibility.Filter(events, Side.Blue, new[] { 11 });
+            var visible = EventVisibility.Filter(events, Side.Blue, new[] { 11 }, new HexCoord[0]);
 
             Assert.That(visible.OfType<GuardPlaced>(), Is.Empty);
             Assert.That(visible.OfType<GuardDamaged>(), Is.Empty);
-            Assert.That(visible.OfType<GuardDestroyed>(), Is.Empty);
+            Assert.That(visible.OfType<GuardDestroyed>().Count(), Is.EqualTo(1), "Destruida se cuenta siempre");
             Assert.That(visible.OfType<GuardMoved>().Select(m => m.RobotId), Is.EqualTo(new[] { 11, 12 }));
             Assert.That(visible.OfType<DefenseDestroyed>(), Is.Not.Empty);
         }
@@ -180,7 +180,7 @@ namespace Flagstorm.Presentation.Tests
                 new GuardDestroyed(Side.Red, 10, cell),
             };
 
-            var visible = EventVisibility.Filter(events, Side.Blue, new int[0]);
+            var visible = EventVisibility.Filter(events, Side.Blue, new int[0], new HexCoord[0]);
 
             Assert.That(visible, Has.Count.EqualTo(2));
         }
@@ -198,7 +198,81 @@ namespace Flagstorm.Presentation.Tests
                 new RobotsClashed(Side.Red, 9, 5, 2, 2, 2, 2),
             };
 
-            Assert.That(EventVisibility.Filter(events, Side.Blue, new int[0]), Has.Count.EqualTo(5));
+            Assert.That(EventVisibility.Filter(events, Side.Blue, new int[0], new HexCoord[0]), Has.Count.EqualTo(5));
+        }
+
+        [Test]
+        public void EventLog_HidesADamagedDefenseWhoseCellIsUnknown()
+        {
+            var cell = new HexCoord(2, 2);
+            var events = new IMatchEvent[] { new DefenseDamaged(Side.Red, cell, PrototypeArsenal.DroneShield, 2) };
+
+            Assert.That(EventVisibility.Filter(events, Side.Blue, new int[0], new HexCoord[0]), Is.Empty);
+        }
+
+        [Test]
+        public void EventLog_ShowsADamagedDefenseWhoseCellIsKnown()
+        {
+            var cell = new HexCoord(2, 2);
+            var events = new IMatchEvent[] { new DefenseDamaged(Side.Red, cell, PrototypeArsenal.DroneShield, 2) };
+
+            Assert.That(EventVisibility.Filter(events, Side.Blue, new int[0], new[] { cell }), Has.Count.EqualTo(1));
+        }
+
+        [Test]
+        public void EventLog_AlwaysShowsADestroyedEnemyDefenseOrGuard()
+        {
+            var cell = new HexCoord(2, 2);
+            var events = new IMatchEvent[]
+            {
+                new DefenseDestroyed(Side.Red, cell, PrototypeArsenal.DroneShield),
+                new GuardDestroyed(Side.Red, 10, cell),
+            };
+
+            Assert.That(EventVisibility.Filter(events, Side.Blue, new int[0], new HexCoord[0]), Has.Count.EqualTo(2));
+        }
+
+        [Test]
+        public void EventLog_ShowsAKnownGuardDestroyedByAMissile()
+        {
+            var cell = new HexCoord(2, 2);
+            var events = new IMatchEvent[]
+            {
+                new MissileImpact(Side.Blue, PrototypeArsenal.StandardMissile, cell, new[] { cell }),
+                new GuardDestroyed(Side.Red, 10, cell),
+            };
+
+            var visible = EventVisibility.Filter(events, Side.Blue, new[] { 10 }, new HexCoord[0]);
+
+            Assert.That(visible.OfType<GuardDestroyed>().Count(), Is.EqualTo(1));
+            Assert.That(EventTextFormatter.Format(visible.OfType<GuardDestroyed>().Single(), Side.Blue, 5),
+                Is.EqualTo("Destruiste un defensor rival"));
+        }
+
+        [Test]
+        public void SetupDefenseCaption_SaysFreeInsteadOfTheEnergyCost()
+        {
+            var shield = PrototypeArsenal.Get(PrototypeArsenal.DroneShield);
+
+            Assert.That(WeaponCaptionFormatter.Format(shield, string.Empty, true), Does.Contain("gratis"));
+            Assert.That(WeaponCaptionFormatter.Format(shield, string.Empty, true), Does.Not.Contain("energía"));
+            Assert.That(WeaponCaptionFormatter.Format(shield, "+40 %", false), Does.Contain("3 energía · +40 %"));
+        }
+
+        [Test]
+        public void EndPanel_OffersAProgressResetOnlyWhenAllowed()
+        {
+            var weapons = PrototypeArsenal.All.Take(2).ToList();
+            var without = new HudView(new UnityEngine.UIElements.VisualElement(), weapons);
+            var with = new HudView(new UnityEngine.UIElements.VisualElement(), weapons, true);
+            var clicks = 0;
+            with.ResetProgressClicked += () => clicks++;
+
+            Assert.That(without.ResetProgressButton, Is.Null);
+            Assert.That(with.ResetProgressButton.text, Is.EqualTo("Reiniciar progreso"));
+            Assert.That(with.ResetProgressButton.style.minHeight.value.value, Is.GreaterThanOrEqualTo(44f));
+            with.RaiseResetProgress();
+            Assert.That(clicks, Is.EqualTo(1));
         }
 
         [Test]

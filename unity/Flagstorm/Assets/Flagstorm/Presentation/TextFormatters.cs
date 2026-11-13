@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using Flagstorm.Core.Arsenal;
+using Flagstorm.Core.Map;
 using Flagstorm.Core.Rules;
 
 namespace Flagstorm.Presentation
@@ -158,38 +159,57 @@ namespace Flagstorm.Presentation
     }
 
     // El núcleo emite todos los eventos (para repeticiones); el registro del jugador solo cuenta lo que él ve.
+    // Regla única para piezas rivales (defensas fijas y defensores): "destruida" se cuenta siempre y sin
+    // coordenada; "dañada" o "se movió" solo si la pieza está a la vista del jugador.
     public static class EventVisibility
     {
         public static IReadOnlyList<IMatchEvent> Filter(
-            IEnumerable<IMatchEvent> events, Side viewer, IEnumerable<int> knownEnemyGuardIds)
+            IEnumerable<IMatchEvent> events,
+            Side viewer,
+            IEnumerable<int> knownEnemyGuardIds,
+            IEnumerable<HexCoord> knownEnemyDefenseCells)
         {
             var all = events.ToList();
-            var known = new HashSet<int>(knownEnemyGuardIds);
+            var knownGuards = new HashSet<int>(knownEnemyGuardIds);
+            var knownDefenses = new HashSet<HexCoord>(knownEnemyDefenseCells);
 
             // Un defensor que chocó con un robot del jugador queda a la vista aunque luego caiga destruido.
             foreach (var clash in all.OfType<RobotsClashed>().Where(c => c.Attacker == viewer))
             {
-                known.Add(clash.GuardId);
+                knownGuards.Add(clash.GuardId);
             }
 
-            return all.Where(e => IsVisible(e, viewer, known)).ToList();
+            return all.Where(e => IsVisible(e, viewer, knownGuards, knownDefenses)).ToList();
         }
 
-        private static bool IsVisible(IMatchEvent matchEvent, Side viewer, ISet<int> knownEnemyGuardIds)
+        private static bool IsVisible(
+            IMatchEvent matchEvent, Side viewer, ISet<int> knownGuardIds, ISet<HexCoord> knownDefenseCells)
         {
             switch (matchEvent)
             {
                 case GuardPlaced placed:
                     return placed.Owner == viewer;
                 case GuardMoved moved:
-                    return moved.Owner == viewer || knownEnemyGuardIds.Contains(moved.RobotId);
+                    return moved.Owner == viewer || knownGuardIds.Contains(moved.RobotId);
                 case GuardDamaged damaged:
-                    return damaged.Owner == viewer || knownEnemyGuardIds.Contains(damaged.RobotId);
-                case GuardDestroyed destroyed:
-                    return destroyed.Owner == viewer || knownEnemyGuardIds.Contains(destroyed.RobotId);
+                    return damaged.Owner == viewer || knownGuardIds.Contains(damaged.RobotId);
+                case DefenseDamaged defenseDamaged:
+                    return defenseDamaged.Owner == viewer || knownDefenseCells.Contains(defenseDamaged.Cell);
                 default:
                     return true;
             }
+        }
+    }
+
+    public static class WeaponCaptionFormatter
+    {
+        // En la preparación las defensas son gratis (cuota inicial); en juego cuestan su energía.
+        public static string Format(WeaponDefinition weapon, string modifier, bool free)
+        {
+            var cost = free ? "gratis" : $"{weapon.EnergyCost} energía";
+            return string.IsNullOrEmpty(modifier)
+                ? $"{weapon.DisplayName}\n{cost}"
+                : $"{weapon.DisplayName}\n{cost} · {modifier}";
         }
     }
 

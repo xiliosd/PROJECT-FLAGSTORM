@@ -56,6 +56,25 @@ namespace Flagstorm.Presentation.PlayModeTests
                 Is.EqualTo(new[] { PrototypeArsenal.Drone, PrototypeArsenal.JungleRobot }));
         }
 
+        // Con 1 victoria hay 6 armas y no aparece la selección de arsenal: el reinicio vive en el panel final.
+        [UnityTest]
+        public IEnumerator EndPanelResetsProgressWhenThereIsNoLoadoutScreen()
+        {
+            var store = new ProgressStore();
+            store.RecordWin();
+            yield return SceneManager.LoadSceneAsync(SceneName);
+            yield return null;
+            yield return null;
+
+            var controller = Object.FindAnyObjectByType<MatchController>();
+            Assert.That(controller.Loadout, Is.Null, "Con 6 armas no hay selección de arsenal");
+            Assert.That(controller.Hud.ResetProgressButton, Is.Not.Null);
+
+            controller.Hud.RaiseResetProgress();
+
+            Assert.That(new ProgressStore().Wins, Is.EqualTo(0));
+        }
+
         [UnityTest]
         public IEnumerator PlaysSetupDroneRobotAndAiTurnWithoutErrors()
         {

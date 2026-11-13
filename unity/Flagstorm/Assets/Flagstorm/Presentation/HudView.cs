@@ -31,8 +31,10 @@ namespace Flagstorm.Presentation
         private readonly List<string> _logLines = new List<string>();
         private float _toastUntil;
 
-        // `arsenal` es el loadout del jugador: solo esas armas tienen botón.
-        public HudView(VisualElement root, IReadOnlyList<WeaponDefinition> arsenal)
+        // `arsenal` es el loadout del jugador: solo esas armas tienen botón. `allowProgressReset` muestra en el
+        // panel final el botón de desarrollo para borrar las victorias.
+        public HudView(
+            VisualElement root, IReadOnlyList<WeaponDefinition> arsenal, bool allowProgressReset = false)
         {
             _root = root;
             root.style.flexDirection = FlexDirection.Column;
@@ -69,7 +71,8 @@ namespace Flagstorm.Presentation
             foreach (var weapon in arsenal)
             {
                 var id = weapon.Id;
-                var button = AddButton(_weapons, Caption(weapon, string.Empty), () => WeaponSelected?.Invoke(id));
+                var caption = WeaponCaptionFormatter.Format(weapon, string.Empty, false);
+                var button = AddButton(_weapons, caption, () => WeaponSelected?.Invoke(id));
                 _weaponButtons[id] = button;
             }
 
@@ -79,7 +82,9 @@ namespace Flagstorm.Presentation
             {
                 var id = weapon.Id;
                 _setupDefenseButtons[id] = AddButton(
-                    _setupDefenses, Caption(weapon, string.Empty), () => SetupDefenseSelected?.Invoke(id));
+                    _setupDefenses,
+                    WeaponCaptionFormatter.Format(weapon, string.Empty, true),
+                    () => SetupDefenseSelected?.Invoke(id));
             }
 
             var actions = Row(bottom);
@@ -101,6 +106,11 @@ namespace Flagstorm.Presentation
             _endTitle.style.marginLeft = 24;
             _endTitle.style.marginRight = 24;
             AddButton(_endPanel, "Jugar de nuevo", () => RestartClicked?.Invoke());
+            if (allowProgressReset)
+            {
+                ResetProgressButton = AddButton(_endPanel, "Reiniciar progreso", RaiseResetProgress);
+            }
+
             root.Add(_endPanel);
         }
 
@@ -115,6 +125,13 @@ namespace Flagstorm.Presentation
         public event Action RestartClicked;
 
         public event Action LabelsToggled;
+
+        public event Action ResetProgressClicked;
+
+        // Botón de desarrollo del panel final; null si la compilación no es de desarrollo.
+        internal Button ResetProgressButton { get; }
+
+        internal void RaiseResetProgress() => ResetProgressClicked?.Invoke();
 
         // Capa donde se dibujan las etiquetas sobre las casillas.
         public VisualElement Board { get; }
@@ -145,7 +162,7 @@ namespace Flagstorm.Presentation
         public void SetWeaponState(WeaponDefinition weapon, bool selected, bool affordable, string modifier)
         {
             var button = _weaponButtons[weapon.Id];
-            button.text = Caption(weapon, modifier);
+            button.text = WeaponCaptionFormatter.Format(weapon, modifier, false);
             Highlight(button, selected, affordable);
         }
 
@@ -226,11 +243,6 @@ namespace Flagstorm.Presentation
             var picked = _root.panel?.Pick(panelPosition);
             return picked != null && picked.pickingMode == PickingMode.Position && picked != _root;
         }
-
-        private static string Caption(WeaponDefinition weapon, string modifier) =>
-            string.IsNullOrEmpty(modifier)
-                ? $"{weapon.DisplayName}\n{weapon.EnergyCost} energía"
-                : $"{weapon.DisplayName}\n{weapon.EnergyCost} energía · {modifier}";
 
         private static VisualElement Panel(VisualElement parent)
         {

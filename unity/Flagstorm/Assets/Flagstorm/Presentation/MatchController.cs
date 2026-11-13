@@ -104,11 +104,12 @@ namespace Flagstorm.Presentation
             _enemyIsland = CreateIsland(
                 "Isla rival", view.EnemyIsland, new Vector3(0f, 0f, offset), HoloPalette.EnemyColor);
 
-            _hud = new HudView(_document.rootVisualElement, _session.PlayerWeapons);
+            _hud = new HudView(_document.rootVisualElement, _session.PlayerWeapons, Debug.isDebugBuild);
             _hud.SetupDefenseSelected += OnSetupDefenseSelected;
             _hud.WeaponSelected += OnWeaponSelected;
             _hud.ConfirmSetupClicked += ConfirmSetup;
             _hud.EndTurnClicked += EndTurn;
+            _hud.ResetProgressClicked += ResetProgress;
             _hud.RestartClicked += () => SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
             _labels = new BoardLabels(_hud.Board);
             _hud.LabelsToggled += _labels.ToggleTerrain;
@@ -129,6 +130,8 @@ namespace Flagstorm.Presentation
 
         internal LoadoutView Loadout => _loadout;
 
+        internal HudView Hud => _hud;
+
         internal IslandRenderer OwnIsland => _ownIsland;
 
         internal IslandRenderer EnemyIsland => _enemyIsland;
@@ -136,6 +139,13 @@ namespace Flagstorm.Presentation
         internal void ConfirmSetup() => Apply(_session.ConfirmSetup());
 
         internal void EndTurn() => Apply(_session.EndTurn());
+
+        // Solo de desarrollo: con 1 victoria no hay pantalla de arsenal, así que el reinicio vive también aquí.
+        internal void ResetProgress()
+        {
+            _progress.Reset();
+            _hud.ShowToast("Progreso reiniciado: 0 victorias");
+        }
 
         internal void OnSetupDefenseSelected(string weaponId)
         {
@@ -267,9 +277,7 @@ namespace Flagstorm.Presentation
                     _hud.ShowToast(RejectionTextFormatter.Format(result.Reason));
                 }
 
-                var view = _session.View;
-                var visibleEvents = EventVisibility.Filter(
-                    result.Events, MatchSession.HumanSide, view.KnownEnemyGuards.Select(g => g.RobotId));
+                var visibleEvents = _session.VisibleEventsOf(result);
                 foreach (var matchEvent in visibleEvents)
                 {
                     _hud.AddLog(EventTextFormatter.Format(
@@ -444,12 +452,22 @@ namespace Flagstorm.Presentation
             var island = _enemyIsland;
             island.ClearMarkers();
             var revealed = view.RevealedEnemyCells;
+
+            // Los escudos y antimisiles rivales conocidos también tiñen su zona (15 % del color rival).
+            var zones = new HashSet<HexCoord>();
+            foreach (var defense in view.KnownEnemyDefenses)
+            {
+                AddZone(zones, view.EnemyIsland, defense.Value.WeaponId, defense.Key);
+            }
+
             foreach (var cell in view.EnemyIsland.Cells)
             {
                 var terrain = HoloPalette.TerrainColor(cell.Value);
                 var visible = revealed.Contains(cell.Key);
                 var fogged = Color.Lerp(HoloPalette.Ocean, terrain, FogVisibility);
-                island.SetCellColor(cell.Key, visible ? terrain : fogged);
+                var baseColor = visible ? terrain : fogged;
+                island.SetCellColor(
+                    cell.Key, zones.Contains(cell.Key) ? Color.Lerp(baseColor, HoloPalette.EnemyColor, ZoneTint) : baseColor);
             }
 
             var enemy = HoloPalette.EnemyColor;

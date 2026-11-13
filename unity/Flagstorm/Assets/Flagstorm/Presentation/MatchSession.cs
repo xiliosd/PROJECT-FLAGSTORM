@@ -19,6 +19,8 @@ namespace Flagstorm.Presentation
         private readonly BasicAiPlayer _ai;
         private readonly List<HexCoord> _pendingFlags = new List<HexCoord>();
         private readonly List<DefensePlacement> _pendingDefenses = new List<DefensePlacement>();
+        private readonly HashSet<int> _knownGuardIdsBefore = new HashSet<int>();
+        private readonly HashSet<HexCoord> _knownDefenseCellsBefore = new HashSet<HexCoord>();
         private int _aiCommandsThisTurn;
 
         public MatchSession(Match match, IReadOnlyList<WeaponDefinition> arsenal, BasicAiPlayer ai)
@@ -64,7 +66,7 @@ namespace Flagstorm.Presentation
             ArsenalProgression.UnlockedAfter(0).Select(w => w.Id).ToList(),
             ArsenalProgression.UnlockedAfter(0));
 
-        // La IA arma su loadout con ChooseLoadout entre las mismas armas desbloqueadas del jugador.
+        // La IA arma su loadout entre las mismas armas desbloqueadas y con el mismo tamaño que el del jugador.
         public static MatchSession Create(
             uint seed, IReadOnlyList<string> playerLoadout, IReadOnlyList<WeaponDefinition> unlocked)
         {
@@ -76,7 +78,7 @@ namespace Flagstorm.Presentation
 
             var humanIsland = PrototypeIslands.CreateDefault();
             var ai = new BasicAiPlayer(new SeededRandom(seed));
-            var aiLoadout = ai.ChooseLoadout(humanIsland, unlocked, LoadoutRules.MaxSlots);
+            var aiLoadout = ai.ChooseLoadout(humanIsland, unlocked, playerLoadout.Count);
             var match = new Match(
                 humanIsland,
                 PrototypeIslands.CreateDefault(),
@@ -104,6 +106,7 @@ namespace Flagstorm.Presentation
         // Devuelve null si el toque solo cambió la selección; un resultado si se intentó un comando.
         public CommandResult TapOwnCell(HexCoord cell)
         {
+            RememberKnownPieces();
             if (Match.Phase == MatchPhase.Setup)
             {
                 return ToggleSetupCell(cell);
@@ -122,6 +125,7 @@ namespace Flagstorm.Presentation
 
         public CommandResult ConfirmSetup()
         {
+            RememberKnownPieces();
             var result = Match.Submit(HumanSide, new SetupCommand(_pendingFlags.ToList(), _pendingDefenses.ToList()));
             if (result.IsAccepted)
             {
@@ -140,6 +144,7 @@ namespace Flagstorm.Presentation
 
         public CommandResult TapEnemyCell(HexCoord cell)
         {
+            RememberKnownPieces();
             if (!IsHumanTurn)
             {
                 return null;
@@ -178,6 +183,7 @@ namespace Flagstorm.Presentation
 
         public CommandResult EndTurn()
         {
+            RememberKnownPieces();
             SelectedRobotId = null;
             _aiCommandsThisTurn = 0;
             return Match.Submit(HumanSide, new EndTurnCommand());
@@ -191,6 +197,7 @@ namespace Flagstorm.Presentation
                 return null;
             }
 
+            RememberKnownPieces();
             _aiCommandsThisTurn++;
             var command = _aiCommandsThisTurn > MaxAiCommandsPerTurn
                 ? new EndTurnCommand()
@@ -199,8 +206,29 @@ namespace Flagstorm.Presentation
             return result.IsAccepted ? result : Match.Submit(AiSide, new EndTurnCommand());
         }
 
+        // Eventos que el jugador puede ver tras un comando: una pieza rival cuenta si estaba a la vista antes
+        // del comando o lo está después (p. ej. un defensor que un misil acaba de destruir).
+        public IReadOnlyList<IMatchEvent> VisibleEventsOf(CommandResult result)
+        {
+            var view = View;
+            return EventVisibility.Filter(
+                result.Events,
+                HumanSide,
+                _knownGuardIdsBefore.Union(view.KnownEnemyGuards.Select(g => g.RobotId)),
+                _knownDefenseCellsBefore.Union(view.KnownEnemyDefenses.Keys));
+        }
+
         private static bool IsDefenseWeapon(WeaponDefinition weapon) =>
             weapon.Category == WeaponCategory.Defend || weapon.Category == WeaponCategory.Guard;
+
+        private void RememberKnownPieces()
+        {
+            var view = View;
+            _knownGuardIdsBefore.Clear();
+            _knownGuardIdsBefore.UnionWith(view.KnownEnemyGuards.Select(g => g.RobotId));
+            _knownDefenseCellsBefore.Clear();
+            _knownDefenseCellsBefore.UnionWith(view.KnownEnemyDefenses.Keys);
+        }
 
         private CommandResult ToggleSetupCell(HexCoord cell)
         {
@@ -239,7 +267,9 @@ namespace Flagstorm.Presentation
             }
 
             var definition = WeaponById(robot.WeaponId);
-            var path = PathFinder.FindPath(view.EnemyIsland, definition, robot.Position, destination);
+            // Los defensores conocidos bloquean el paso; los que no se han visto no se pueden esquivar.
+            var knownGuards = new HashSet<HexCoord>(view.KnownEnemyGuards.Select(g => g.Position));
+            var path = PathFinder.FindPath(view.EnemyIsland, definition, robot.Position, destination, knownGuards);
             if (path == null || path.Count == 0)
             {
                 return CommandResult.Rejected(RejectionReason.InvalidPath);

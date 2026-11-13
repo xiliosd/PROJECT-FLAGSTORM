@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Linq;
+using Flagstorm.Core.Ai;
 using Flagstorm.Core.Arsenal;
 using Flagstorm.Core.Map;
 using Flagstorm.Core.Rules;
@@ -257,6 +259,84 @@ namespace Flagstorm.Presentation.Tests
 
             Assert.That(session.IsAiTurn, Is.False);
             Assert.That(session.Match.CurrentSide, Is.EqualTo(MatchSession.HumanSide));
+        }
+
+        [Test]
+        public void Create_AiLoadoutHasTheSameSizeAsThePlayers()
+        {
+            var unlocked = ArsenalProgression.UnlockedAfter(3);
+            var playerLoadout = unlocked.Take(4).Select(w => w.Id).ToList();
+
+            var session = MatchSession.Create(Seed, playerLoadout, unlocked);
+
+            Assert.That(session.Match.LoadoutOf(MatchSession.AiSide), Has.Count.EqualTo(playerLoadout.Count));
+        }
+
+        [Test]
+        public void Robot_WalksAroundAKnownGuard()
+        {
+            var island = PrototypeIslands.CreateDefault();
+            var landing = island.CoastCells.First();
+            var guardPost = landing.Neighbors().First(island.InteriorCells.Contains);
+            var session = StartedSessionWithRedGuard(island, guardPost);
+            var definition = PrototypeArsenal.Get(PrototypeArsenal.BeachRobot);
+            var blocked = new HashSet<HexCoord> { guardPost };
+            var destination = island.Cells.Keys.First(cell =>
+                cell != guardPost
+                && PathFinder.FindPath(island, definition, landing, cell)?.Contains(guardPost) == true
+                && PathFinder.FindPath(island, definition, landing, cell, blocked) != null);
+
+            session.SelectWeapon(PrototypeArsenal.BeachRobot);
+            Assert.That(session.TapEnemyCell(landing).IsAccepted, Is.True);
+            Assert.That(session.View.KnownEnemyGuards.Single().Position, Is.EqualTo(guardPost));
+            session.TapEnemyCell(landing);
+            var result = session.TapEnemyCell(destination);
+
+            Assert.That(result.IsAccepted, Is.True, result.Reason.ToString());
+            Assert.That(result.Events.OfType<RobotMoved>().Single().Path, Has.No.Member(guardPost));
+        }
+
+        [Test]
+        public void MissileOnARevealedGuard_ShowsItsDamageInTheLog()
+        {
+            var island = PrototypeIslands.CreateDefault();
+            var guardPost = island.InteriorCells.First();
+            var session = StartedSessionWithRedGuard(island, guardPost);
+            session.SelectWeapon(PrototypeArsenal.Drone);
+            session.TapEnemyCell(guardPost);
+            Assert.That(session.View.KnownEnemyGuards, Has.Count.EqualTo(1));
+
+            session.SelectWeapon(PrototypeArsenal.Drone);
+            session.SelectWeapon(PrototypeArsenal.StandardMissile);
+            var result = session.TapEnemyCell(guardPost);
+
+            Assert.That(result.IsAccepted, Is.True, result.Reason.ToString());
+            Assert.That(session.VisibleEventsOf(result).OfType<GuardDamaged>().Count(), Is.EqualTo(1));
+        }
+
+        // Rojo ya hizo su preparación con un defensor gratis en `guardPost`, así que la IA no la repite.
+        private static MatchSession StartedSessionWithRedGuard(IslandMap island, HexCoord guardPost)
+        {
+            var loadout = ArsenalProgression.UnlockedAfter(1).Select(w => w.Id).ToList();
+            var match = new Match(
+                PrototypeIslands.CreateDefault(), island, RulesConfig.Default, PrototypeArsenal.All, loadout, loadout);
+            var others = island.InteriorCells.Where(c => c != guardPost).ToList();
+            var secondGuard = others.Last();
+            var flags = others.Take(5).ToList();
+            var placements = new[]
+            {
+                new DefensePlacement(PrototypeArsenal.BeachGuard, guardPost),
+                new DefensePlacement(PrototypeArsenal.BeachGuard, secondGuard),
+            };
+            Assert.That(match.Submit(MatchSession.AiSide, new SetupCommand(flags, placements)).IsAccepted, Is.True);
+            var session = new MatchSession(match, PrototypeArsenal.All, new BasicAiPlayer(new SeededRandom(Seed)));
+            foreach (var cell in OwnCells(session).Take(5))
+            {
+                session.TapOwnCell(cell);
+            }
+
+            Assert.That(session.ConfirmSetup().IsAccepted, Is.True);
+            return session;
         }
 
         private static MatchSession StartedSession()
