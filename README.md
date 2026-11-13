@@ -65,7 +65,7 @@ Pendiente (tarea 12 del plan).
 - Pruebas: NUnit 4.6.1, NUnit3TestAdapter 6.3.1, Microsoft.NET.Test.Sdk 18.11.0,
   coverlet.collector 10.1.0.
 - Estilo: StyleCop.Analyzers 1.2.0-beta.556 + `.editorconfig`.
-- Motor: Unity 6000.3.28f1 + URP 17.6.0 + Input System 1.20.1 + Test Framework 1.8.0 (`unity/Flagstorm`).
+- Motor: Unity 6000.3.28f1 + URP 17.3.0 + Input System 1.20.1 + Test Framework 1.6.0 (`unity/Flagstorm`).
 
 ### Excepciones a los lineamientos
 
@@ -79,17 +79,25 @@ Pendiente (tarea 12 del plan).
 ```csharp
 var match = new Match(PrototypeIslands.CreateDefault(), PrototypeIslands.CreateDefault(),
     RulesConfig.Default, PrototypeArsenal.All);
-match.Submit(Side.Blue, new SetupCommand(flags, turrets));
+match.Submit(Side.Blue, new SetupCommand(flags, new[]
+{
+    new DefensePlacement(PrototypeArsenal.Turret, new HexCoord(3, 1)),
+    new DefensePlacement(PrototypeArsenal.DroneShield, new HexCoord(0, 2)),
+}));
 match.Submit(Side.Blue, new LaunchDroneCommand(PrototypeArsenal.Drone, new HexCoord(1, 1)));
 ```
 
 ### Arsenal y progreso en el juego
 
-- Cada victoria desbloquea el siguiente nivel de armas (la primera: misil estándar y antimisiles). El
+- Cada victoria desbloquea el siguiente nivel de armas (la primera: misil estándar y antimisiles). Los
+  niveles se desbloquean "en pares" (robot de ataque y su defensor, misil incendiario y torreta), con una
+  excepción: el señuelo se desbloquea solo, en el nivel 7. El
   progreso es solo el número de victorias, guardado en el dispositivo con la clave
   `flagstorm.victorias`; no se guarda ningún dato personal.
 - Antes de cada partida, si hay más de 6 armas desbloqueadas, aparece la pantalla "Elige tu arsenal":
   se marcan hasta 6 y "Jugar" solo se habilita con un arsenal válido (al menos un robot de ataque).
   Con 6 armas o menos se juega con todas.
 - Al ganar, el panel final avisa qué se desbloqueó ("Nuevo: ...").
-- En builds de desarrollo, la pantalla de arsenal muestra "Reiniciar progreso" para volver a 0 victorias.
+- En builds de desarrollo, la pantalla de arsenal y el panel final muestran "Reiniciar progreso" para
+  volver a 0 victorias (con exactamente 1 victoria no hay pantalla de arsenal, por eso también está en el
+  panel final).
