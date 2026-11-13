@@ -8,7 +8,12 @@ namespace Flagstorm.Core.Map
     {
         // Dijkstra con desempate determinista: a igual costo gana la celda descubierta primero.
         public static IReadOnlyList<HexCoord> FindPath(
-            IslandMap map, Func<TerrainType, int> movementCost, HexCoord from, HexCoord to)
+            IslandMap map, Func<TerrainType, int> movementCost, HexCoord from, HexCoord to) =>
+            FindPath(map, movementCost, from, to, null);
+
+        // Las celdas bloqueadas (p. ej. defensores rivales conocidos) no se pueden pisar, ni siquiera la meta.
+        public static IReadOnlyList<HexCoord> FindPath(
+            IslandMap map, Func<TerrainType, int> movementCost, HexCoord from, HexCoord to, ISet<HexCoord> blocked)
         {
             if (map == null)
             {
@@ -20,7 +25,7 @@ namespace Flagstorm.Core.Map
                 throw new ArgumentNullException(nameof(movementCost));
             }
 
-            if (!map.Contains(from) || !map.Contains(to))
+            if (!map.Contains(from) || !map.Contains(to) || (blocked != null && blocked.Contains(to)))
             {
                 return null;
             }
@@ -47,7 +52,7 @@ namespace Flagstorm.Core.Map
 
                 foreach (var next in current.Cell.Neighbors())
                 {
-                    if (!map.Contains(next))
+                    if (!map.Contains(next) || (blocked != null && blocked.Contains(next)))
                     {
                         continue;
                     }
@@ -101,6 +106,10 @@ namespace Flagstorm.Core.Map
         public static IReadOnlyList<HexCoord> FindPath(
             IslandMap map, WeaponDefinition robot, HexCoord from, HexCoord to) =>
             FindPath(map, CostOf(robot), from, to);
+
+        public static IReadOnlyList<HexCoord> FindPath(
+            IslandMap map, WeaponDefinition robot, HexCoord from, HexCoord to, ISet<HexCoord> blocked) =>
+            FindPath(map, CostOf(robot), from, to, blocked);
 
         public static int PathCost(IslandMap map, WeaponDefinition robot, IReadOnlyList<HexCoord> path) =>
             PathCost(map, CostOf(robot), path);

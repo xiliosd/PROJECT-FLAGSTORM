@@ -9,16 +9,24 @@ namespace Flagstorm.Core.Ai
 {
     // IA del prototipo. Solo recibe PlayerView, nunca Match: no puede ver lo oculto (spec §5.2).
     // Pide un comando a la vez para decidir siempre con la vista actualizada.
-    public sealed class BasicAiPlayer
+    // Las partes parciales separan el arsenal (Loadout) y la construcción de defensas (Defense).
+    public sealed partial class BasicAiPlayer
     {
         private const int MaxRobots = 3;
-        private const int MaxTurrets = 4;
-        private const int MaxDecoys = 2;
+
+        // Un robot propio a esta distancia de un defensor o torreta rival ya está en su alcance.
+        private const int ThreatDistance = 2;
 
         private readonly IRandomSource _random;
 
         // Celdas que pisaron nuestros robots: los robots no revelan, así que la IA recuerda dónde ya buscó.
         private readonly HashSet<HexCoord> _visited = new HashSet<HexCoord>();
+
+        // Comandos propuestos en el turno en curso. La partida no avisa a la IA de los rechazos, pero un comando
+        // válido nunca se repite igual en el mismo turno (cambia el estado): si reaparece es porque se rechazó.
+        // Se descarta y se elige otra jugada para no quedarse atascada.
+        private readonly HashSet<string> _proposed = new HashSet<string>();
+        private int _proposedTurn = -1;
 
         public BasicAiPlayer(IRandomSource random)
         {
@@ -84,12 +92,30 @@ namespace Flagstorm.Core.Ai
                 return new EndTurnCommand();
             }
 
-            return TryMoveRobot(view, arsenal)
-                ?? TryDeploy(view, arsenal)
-                ?? TryMissile(view, arsenal)
-                ?? TryDrone(view, arsenal)
-                ?? TryDefend(view, arsenal)
+            if (view.TurnNumber != _proposedTurn)
+            {
+                _proposed.Clear();
+                _proposedTurn = view.TurnNumber;
+            }
+
+            // Solo se usan armas del loadout: el catálogo completo sirve únicamente para conocer las armas rivales.
+            var available = arsenal.Where(w => view.Loadout == null || view.Loadout.Contains(w.Id)).ToList();
+            return TryMissile(view, available, arsenal, view.KnownEnemyGuards.Select(g => g.Position))
+                ?? TryMoveRobot(view, arsenal)
+                ?? TryDeploy(view, available)
+                ?? TryMissile(view, available, arsenal, TurretCells(view))
+                ?? TryDrone(view, available)
+                ?? TryDefend(view, available, arsenal)
                 ?? (IMatchCommand)new EndTurnCommand();
+        }
+
+        private bool IsFresh(string key) => !_proposed.Contains(key);
+
+        private T Propose<T>(string key, T command)
+            where T : IMatchCommand
+        {
+            _proposed.Add(key);
+            return command;
         }
 
         // Torretas como siempre si el arsenal las trae; si no, las primeras defensas del arsenal por orden,
@@ -103,13 +129,17 @@ namespace Flagstorm.Core.Ai
             }
 
             return ids
-                .Where(id => PrototypeArsenal.All.Any(w => w.Id == id && w.Category == WeaponCategory.Defend))
+                .Where(id => PrototypeArsenal.All.Any(
+                    w => w.Id == id && (w.Category == WeaponCategory.Defend || w.Category == WeaponCategory.Guard)))
                 .Take(count)
                 .ToList();
         }
 
+        // Avanza de a una casilla: los defensores a distancia 1 siempre son conocidos, así que una ruta de un
+        // solo paso nunca se topa con un defensor oculto y es rechazada.
         private IMatchCommand TryMoveRobot(PlayerView view, IReadOnlyList<WeaponDefinition> arsenal)
         {
+            var blocked = KnownGuardCells(view);
             foreach (var robot in view.OwnRobots.Where(r => r.MovementPointsLeft > 0))
             {
                 _visited.Add(robot.Position);
@@ -117,7 +147,7 @@ namespace Flagstorm.Core.Ai
                 var targets = view.EnemySignals.Count > 0
                     ? view.EnemySignals
                     : Unexplored(view).ToList();
-                var path = CheapestPath(view.EnemyIsland, definition, robot.Position, targets);
+                var path = CheapestPath(view.EnemyIsland, definition, robot.Position, targets, blocked);
                 if (path == null)
                 {
                     continue;
@@ -129,45 +159,73 @@ namespace Flagstorm.Core.Ai
                     continue;
                 }
 
-                foreach (var cell in step)
+                var key = $"move:{robot.RobotId}:{step[0].Q},{step[0].R}";
+                if (!IsFresh(key))
                 {
-                    _visited.Add(cell);
+                    continue;
                 }
 
-                return new MoveRobotCommand(robot.RobotId, step);
+                _visited.Add(step[0]);
+                return Propose(key, new MoveRobotCommand(robot.RobotId, new[] { step[0] }));
             }
 
             return null;
         }
 
-        private IMatchCommand TryMissile(PlayerView view, IReadOnlyList<WeaponDefinition> arsenal)
+        private static HashSet<HexCoord> KnownGuardCells(PlayerView view) =>
+            new HashSet<HexCoord>(view.KnownEnemyGuards.Select(g => g.Position));
+
+        private static IEnumerable<HexCoord> TurretCells(PlayerView view) =>
+            view.KnownEnemyDefenses.Where(d => d.Value.WeaponId == PrototypeArsenal.Turret).Select(d => d.Key);
+
+        // Dispara a los objetivos rivales conocidos que estorban a un robot o a una señal propia, con el misil
+        // que más daño hace en ese terreno. Los defensores bloquean el paso, así que se atacan antes de mover;
+        // las torretas solo después de desembarcar, para no gastar en misiles la energía de los robots.
+        private IMatchCommand TryMissile(
+            PlayerView view,
+            IReadOnlyList<WeaponDefinition> available,
+            IReadOnlyList<WeaponDefinition> arsenal,
+            IEnumerable<HexCoord> candidates)
         {
-            var threats = view.KnownEnemyDefenses
-                .Where(d => d.Value.WeaponId == PrototypeArsenal.Turret)
-                .Select(d => d.Key)
-                .Where(t => view.OwnRobots.Any(r => r.Position.DistanceTo(t) <= 2)
-                    || view.EnemySignals.Any(s => s.DistanceTo(t) <= 1))
-                .OrderBy(t => t, CellOrder.Instance)
-                .ToList();
-            foreach (var turret in threats)
+            var threats = candidates
+                .Where(cell => IsObstacle(view, cell) && !IsCoveredByAntiMissile(view, arsenal, cell))
+                .Distinct()
+                .OrderBy(cell => cell, CellOrder.Instance);
+            foreach (var target in threats)
             {
-                var terrain = view.EnemyIsland.TerrainAt(turret);
+                var terrain = view.EnemyIsland.TerrainAt(target);
 
                 // Elegir el misil que mejor rinde en ese terreno: aquí se nota la mecánica de terrenos.
-                var missile = arsenal
+                var missile = available
                     .Where(w => w.Category == WeaponCategory.Destroy && w.EnergyCost <= view.Energy)
                     .OrderByDescending(w => w.EffectivePowerOn(terrain))
                     .FirstOrDefault();
                 if (missile != null)
                 {
-                    return new FireMissileCommand(missile.Id, turret);
+                    return new FireMissileCommand(missile.Id, target);
                 }
             }
 
             return null;
         }
 
-        private IMatchCommand TryDeploy(PlayerView view, IReadOnlyList<WeaponDefinition> arsenal)
+        private static bool IsObstacle(PlayerView view, HexCoord cell) =>
+            view.OwnRobots.Any(r => r.Position.DistanceTo(cell) <= ThreatDistance)
+            || view.EnemySignals.Any(s => s.DistanceTo(cell) <= 1);
+
+        // Un misil dentro del radio de un antimisiles conocido solo desgasta a este: no vale la energía.
+        private static bool IsCoveredByAntiMissile(
+            PlayerView view, IReadOnlyList<WeaponDefinition> arsenal, HexCoord cell) =>
+            view.KnownEnemyDefenses.Any(defense =>
+            {
+                var weapon = arsenal.FirstOrDefault(w => w.Id == defense.Value.WeaponId);
+                return weapon != null
+                    && weapon.Intercepts == WeaponCategory.Destroy
+                    && defense.Key.DistanceTo(cell) <= weapon.Radius;
+            });
+
+        // El robot que desembarca es el de menor costo de ruta hacia el objetivo: así se elige por terreno.
+        private IMatchCommand TryDeploy(PlayerView view, IReadOnlyList<WeaponDefinition> available)
         {
             var hasWork = view.EnemySignals.Count > view.OwnRobots.Count
                 || (view.OwnRobots.Count == 0 && Unrevealed(view).Count() * 3 < view.EnemyIsland.Cells.Count);
@@ -177,16 +235,17 @@ namespace Flagstorm.Core.Ai
             }
 
             var targets = view.EnemySignals.Count > 0 ? view.EnemySignals : Unexplored(view).ToList();
-            var occupied = new HashSet<HexCoord>(view.OwnRobots.Select(r => r.Position));
+            var blocked = KnownGuardCells(view);
+            var occupied = new HashSet<HexCoord>(view.OwnRobots.Select(r => r.Position).Concat(blocked));
             DeployRobotCommand best = null;
             var bestCost = int.MaxValue;
-            var robots = arsenal.Where(w => w.Category == WeaponCategory.Capture && w.EnergyCost <= view.Energy);
+            var robots = available.Where(w => w.Category == WeaponCategory.Capture && w.EnergyCost <= view.Energy);
             foreach (var robot in robots)
             {
                 foreach (var coast in view.EnemyIsland.CoastCells.Where(c => !occupied.Contains(c)))
                 {
-                    var path = CheapestPath(view.EnemyIsland, robot, coast, targets);
-                    if (path == null)
+                    var path = CheapestPath(view.EnemyIsland, robot, coast, targets, blocked);
+                    if (path == null || !IsFresh(DeployKey(robot.Id, coast)))
                     {
                         continue;
                     }
@@ -200,10 +259,12 @@ namespace Flagstorm.Core.Ai
                 }
             }
 
-            return best;
+            return best == null ? null : Propose(DeployKey(best.WeaponId, best.LandingCell), best);
         }
 
-        private IMatchCommand TryDrone(PlayerView view, IReadOnlyList<WeaponDefinition> arsenal)
+        private static string DeployKey(string weaponId, HexCoord cell) => $"deploy:{weaponId}:{cell.Q},{cell.R}";
+
+        private IMatchCommand TryDrone(PlayerView view, IReadOnlyList<WeaponDefinition> available)
         {
             var remainingFlags = view.Rules.FlagsPerSide - view.FlagsCapturedByViewer;
             if (view.EnemySignals.Count >= remainingFlags + 1)
@@ -211,7 +272,8 @@ namespace Flagstorm.Core.Ai
                 return null;
             }
 
-            var drone = arsenal.FirstOrDefault(w => w.Category == WeaponCategory.Reveal && w.EnergyCost <= view.Energy);
+            var drone = available.FirstOrDefault(
+                w => w.Category == WeaponCategory.Reveal && w.EnergyCost <= view.Energy);
             if (drone == null)
             {
                 return null;
@@ -231,50 +293,9 @@ namespace Flagstorm.Core.Ai
 
             var bestGain = scored.Max(x => x.Gain);
             var best = scored.Where(x => x.Gain == bestGain).ToList();
-            return new LaunchDroneCommand(drone.Id, best[_random.Next(0, best.Count)].Cell);
+            var target = best[_random.Next(0, best.Count)].Cell;
+            return new LaunchDroneCommand(drone.Id, target);
         }
-
-        private IMatchCommand TryDefend(PlayerView view, IReadOnlyList<WeaponDefinition> arsenal)
-        {
-            var occupied = new HashSet<HexCoord>(view.OwnFlags.Concat(view.OwnDefenses.Keys)
-                .Concat(view.OwnGuards.Select(g => g.Position))
-                .Concat(view.EnemyRobotsOnOwnIsland.Select(r => r.Position)));
-            var free = view.OwnIsland.Cells.Keys
-                .Where(c => !occupied.Contains(c))
-                .OrderBy(c => c, CellOrder.Instance)
-                .ToList();
-
-            var turret = arsenal.FirstOrDefault(
-                w => w.Id == PrototypeArsenal.Turret && w.EnergyCost <= view.Energy);
-            if (turret != null && CountOwn(view, PrototypeArsenal.Turret) < MaxTurrets)
-            {
-                // Primero frenar robots invasores; si no hay, proteger banderas.
-                var near = free
-                    .Where(c => view.EnemyRobotsOnOwnIsland.Any(r => r.Position.DistanceTo(c) <= 1))
-                    .ToList();
-                if (near.Count == 0 && view.EnemyRobotsOnOwnIsland.Count == 0)
-                {
-                    near = free.Where(c => view.OwnFlags.Any(f => f.DistanceTo(c) == 1)).ToList();
-                }
-
-                if (near.Count > 0)
-                {
-                    return new BuildDefenseCommand(turret.Id, near[_random.Next(0, near.Count)]);
-                }
-            }
-
-            var decoy = arsenal.FirstOrDefault(w => w.Id == PrototypeArsenal.Decoy && w.EnergyCost <= view.Energy);
-            var interior = free.Where(view.OwnIsland.InteriorCells.Contains).ToList();
-            if (decoy != null && CountOwn(view, PrototypeArsenal.Decoy) < MaxDecoys && interior.Count > 0)
-            {
-                return new BuildDefenseCommand(decoy.Id, interior[_random.Next(0, interior.Count)]);
-            }
-
-            return null;
-        }
-
-        private static int CountOwn(PlayerView view, string weaponId) =>
-            view.OwnDefenses.Values.Count(d => d.WeaponId == weaponId);
 
         private IEnumerable<HexCoord> Unrevealed(PlayerView view)
         {
@@ -291,7 +312,11 @@ namespace Flagstorm.Core.Ai
         }
 
         private static IReadOnlyList<HexCoord> CheapestPath(
-            IslandMap island, WeaponDefinition robot, HexCoord from, IEnumerable<HexCoord> targets)
+            IslandMap island,
+            WeaponDefinition robot,
+            HexCoord from,
+            IEnumerable<HexCoord> targets,
+            ISet<HexCoord> blocked)
         {
             IReadOnlyList<HexCoord> best = null;
             var bestCost = int.MaxValue;
@@ -302,7 +327,7 @@ namespace Flagstorm.Core.Ai
                     continue;
                 }
 
-                var path = PathFinder.FindPath(island, robot, from, target);
+                var path = PathFinder.FindPath(island, robot, from, target, blocked);
                 if (path == null)
                 {
                     continue;
