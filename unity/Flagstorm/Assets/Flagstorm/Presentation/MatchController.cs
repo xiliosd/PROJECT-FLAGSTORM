@@ -47,17 +47,54 @@ namespace Flagstorm.Presentation
         private MatchSession _session;
         private UIDocument _document;
         private HudView _hud;
+        private LoadoutView _loadout;
         private BoardLabels _labels;
         private IslandRenderer _ownIsland;
         private IslandRenderer _enemyIsland;
         private HexCoord? _hoveredEnemyCell;
         private bool _aiRunning;
+        private bool _winRecorded;
+        private string _unlockText = string.Empty;
+        private readonly ProgressStore _progress = new ProgressStore();
         private float _fittedAspect;
 
         private void Start()
         {
+            _document = GetComponent<UIDocument>();
+            ShowLoadoutOrStart();
+        }
+
+        // Con 6 armas o menos desbloqueadas no hay nada que elegir: se juega con todas.
+        private void ShowLoadoutOrStart()
+        {
+            var unlocked = ArsenalProgression.UnlockedAfter(_progress.Wins);
+            if (unlocked.Count <= LoadoutRules.MaxSlots)
+            {
+                BeginMatch(unlocked.Select(w => w.Id).ToList(), unlocked);
+                return;
+            }
+
+            _loadout = new LoadoutView(
+                _document.rootVisualElement, unlocked, _progress.Wins, Debug.isDebugBuild);
+            _loadout.PlayClicked += selection =>
+            {
+                _loadout.Remove();
+                _loadout = null;
+                BeginMatch(selection, unlocked);
+            };
+            _loadout.ResetProgressClicked += () =>
+            {
+                _progress.Reset();
+                _loadout.Remove();
+                _loadout = null;
+                ShowLoadoutOrStart();
+            };
+        }
+
+        private void BeginMatch(IReadOnlyList<string> loadout, IReadOnlyList<WeaponDefinition> unlocked)
+        {
             var matchSeed = seed != 0 ? seed : (uint)System.Environment.TickCount | 1u;
-            _session = MatchSession.CreateDefault(matchSeed);
+            _session = MatchSession.Create(matchSeed, loadout, unlocked);
 
             var view = _session.View;
             var islandDepth = IslandDepth(view.OwnIsland);
@@ -67,7 +104,6 @@ namespace Flagstorm.Presentation
             _enemyIsland = CreateIsland(
                 "Isla rival", view.EnemyIsland, new Vector3(0f, 0f, offset), HoloPalette.EnemyColor);
 
-            _document = GetComponent<UIDocument>();
             _hud = new HudView(_document.rootVisualElement, _session.PlayerWeapons);
             _hud.SetupDefenseSelected += OnSetupDefenseSelected;
             _hud.WeaponSelected += OnWeaponSelected;
@@ -90,6 +126,8 @@ namespace Flagstorm.Presentation
 
         // Accesos internos para la prueba de humo en modo de juego (InternalsVisibleTo).
         internal MatchSession Session => _session;
+
+        internal LoadoutView Loadout => _loadout;
 
         internal IslandRenderer OwnIsland => _ownIsland;
 
@@ -265,9 +303,24 @@ namespace Flagstorm.Presentation
 
             if (match.Phase == MatchPhase.Finished)
             {
-                _hud.ShowEnd(EndReasonFormatter.Format(
-                    match.Winner.Value, MatchSession.HumanSide, rules.FlagsPerSide));
+                RecordWinOnce(match.Winner.Value);
+                _hud.ShowEnd(
+                    EndReasonFormatter.Format(match.Winner.Value, MatchSession.HumanSide, rules.FlagsPerSide),
+                    _unlockText);
             }
+        }
+
+        // Refresh se repite con la partida terminada; la victoria solo se cuenta la primera vez.
+        private void RecordWinOnce(Side winner)
+        {
+            if (_winRecorded || winner != MatchSession.HumanSide)
+            {
+                return;
+            }
+
+            _winRecorded = true;
+            _unlockText = UnlockTextFormatter.Format(_progress.Wins);
+            _progress.RecordWin();
         }
 
         private string StatusText(Match match)

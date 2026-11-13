@@ -6,11 +6,11 @@
 
 ## Partidas
 
-| # | Duración (min) | Turnos | Ganador | ¿El terreno cambió alguna decisión de arsenal? | FPS percibidos |
-|---|---|---|---|---|---|
-| 1 | | | | | |
-| 2 | | | | | |
-| 3 | | | | | |
+| # | Victorias previas | Arsenal elegido | Duración (min) | Turnos | Ganador | ¿El terreno cambió alguna decisión de arsenal? | ¿Las defensas o defensores importaron? | ¿Quedó clara la causa de la derrota? | FPS percibidos |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | | | | | | | | | |
+| 2 | | | | | | | | | |
+| 3 | | | | | | | | | |
 
 ## Momentos aburridos o confusos
 
@@ -27,6 +27,11 @@
   arriesgado o si la IA tiene ventaja.
 - En las partidas IA contra IA de la tarea 9, Blue (el que empieza) ganó 14 de 20: posible ventaja
   del primer turno.
+- Equilibrio IA contra IA de la tarea 6 (simulación, 20 partidas por configuración):
+  - Arsenal completo: mediana de 13 turnos; Blue ganó 14 de 20.
+  - Arsenal inicial: mediana de 14 turnos; Blue ganó 9 de 20.
+- Para esta prueba: probar también la selección de arsenal tras 2 o más victorias y anotar si el
+  texto "Nuevo: ..." del panel final y el motivo de "Jugar" deshabilitado se entienden.
 
 ## Ajustes decididos
 

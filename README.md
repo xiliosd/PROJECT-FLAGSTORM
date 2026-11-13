@@ -37,8 +37,14 @@ dotnet format --verify-no-changes                  # estilo (StyleCop + .editorc
 Pruebas EditMode de Unity (desde la raíz del repo):
 
 ```bash
-"C:/Program Files/Unity/Hub/Editor/6000.6.8f1/Editor/Unity.exe" -batchmode -nographics   -projectPath unity/Flagstorm -runTests -testPlatform EditMode -testResults TestResults/editmode.xml
+"D:/TRABAJO/UnityEditor/6000.3.28f1/Editor/Unity.exe" -batchmode -nographics -projectPath unity/Flagstorm -runTests -testPlatform EditMode -testResults TestResults/editmode.xml
 ```
+
+Unity 6000.3.28f1 está instalado en `D:/TRABAJO/UnityEditor`. Para PlayMode usa
+`-testPlatform PlayMode` (sin `-nographics`). Con el proyecto abierto en el editor, el modo por lotes
+falla: ciérralo antes. El APK de desarrollo se compila con el menú `Flagstorm → Compilar APK de
+desarrollo` o por lotes con `-quit -executeMethod Flagstorm.EditorTools.AndroidBuilder.BuildDevelopmentApk`
+(sale en `unity/Flagstorm/Builds/Android/flagstorm-dev.apk`).
 
 ## Deployment
 
@@ -59,7 +65,7 @@ Pendiente (tarea 12 del plan).
 - Pruebas: NUnit 4.6.1, NUnit3TestAdapter 6.3.1, Microsoft.NET.Test.Sdk 18.11.0,
   coverlet.collector 10.1.0.
 - Estilo: StyleCop.Analyzers 1.2.0-beta.556 + `.editorconfig`.
-- Motor: Unity 6000.6.8f1 + URP 17.6.0 + Input System 1.20.1 + Test Framework 1.8.0 (`unity/Flagstorm`).
+- Motor: Unity 6000.3.28f1 + URP 17.6.0 + Input System 1.20.1 + Test Framework 1.8.0 (`unity/Flagstorm`).
 
 ### Excepciones a los lineamientos
 
@@ -76,3 +82,14 @@ var match = new Match(PrototypeIslands.CreateDefault(), PrototypeIslands.CreateD
 match.Submit(Side.Blue, new SetupCommand(flags, turrets));
 match.Submit(Side.Blue, new LaunchDroneCommand(PrototypeArsenal.Drone, new HexCoord(1, 1)));
 ```
+
+### Arsenal y progreso en el juego
+
+- Cada victoria desbloquea el siguiente nivel de armas (la primera: misil estándar y antimisiles). El
+  progreso es solo el número de victorias, guardado en el dispositivo con la clave
+  `flagstorm.victorias`; no se guarda ningún dato personal.
+- Antes de cada partida, si hay más de 6 armas desbloqueadas, aparece la pantalla "Elige tu arsenal":
+  se marcan hasta 6 y "Jugar" solo se habilita con un arsenal válido (al menos un robot de ataque).
+  Con 6 armas o menos se juega con todas.
+- Al ganar, el panel final avisa qué se desbloqueó ("Nuevo: ...").
+- En builds de desarrollo, la pantalla de arsenal muestra "Reiniciar progreso" para volver a 0 victorias.

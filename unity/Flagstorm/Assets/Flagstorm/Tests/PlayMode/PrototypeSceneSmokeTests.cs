@@ -19,6 +19,43 @@ namespace Flagstorm.Presentation.PlayModeTests
         // Tope de espera para el turno de la IA (0,6 s por jugada).
         private const float AiTurnTimeoutSeconds = 30f;
 
+        [SetUp]
+        public void ResetProgressBefore() => new ProgressStore().Reset();
+
+        [TearDown]
+        public void ResetProgressAfter() => new ProgressStore().Reset();
+
+        // Con 2 victorias hay 8 armas: aparece la selección de arsenal y "Jugar" exige un robot de ataque.
+        [UnityTest]
+        public IEnumerator ShowsLoadoutWhenMoreThanSixWeaponsAreUnlocked()
+        {
+            var store = new ProgressStore();
+            store.RecordWin();
+            store.RecordWin();
+            yield return SceneManager.LoadSceneAsync(SceneName);
+            yield return null;
+            yield return null;
+
+            var controller = Object.FindAnyObjectByType<MatchController>();
+            var loadout = controller.Loadout;
+            Assert.That(loadout, Is.Not.Null, "Debe mostrarse la selección de arsenal");
+            Assert.That(controller.Session, Is.Null, "La partida no empieza hasta pulsar Jugar");
+            Assert.That(loadout.CanPlay, Is.False);
+            Assert.That(loadout.ReasonText, Does.Contain("robot de ataque"));
+
+            loadout.Toggle(PrototypeArsenal.Drone);
+            Assert.That(loadout.CanPlay, Is.False, "Sin robot de ataque no se puede jugar");
+            loadout.Toggle(PrototypeArsenal.JungleRobot);
+            Assert.That(loadout.CanPlay, Is.True);
+            loadout.Click();
+            yield return null;
+
+            Assert.That(controller.Loadout, Is.Null);
+            Assert.That(controller.Session, Is.Not.Null);
+            Assert.That(controller.Session.PlayerWeapons.Select(w => w.Id),
+                Is.EqualTo(new[] { PrototypeArsenal.Drone, PrototypeArsenal.JungleRobot }));
+        }
+
         [UnityTest]
         public IEnumerator PlaysSetupDroneRobotAndAiTurnWithoutErrors()
         {

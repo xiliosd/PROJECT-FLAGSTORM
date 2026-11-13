@@ -200,9 +200,9 @@ namespace Flagstorm.Presentation
             _toastUntil = Time.unscaledTime + 2f;
         }
 
-        public void ShowEnd(string reason)
+        public void ShowEnd(string reason, string unlockText = "")
         {
-            _endTitle.text = reason;
+            _endTitle.text = string.IsNullOrEmpty(unlockText) ? reason : reason + "\n\n" + unlockText;
             _endPanel.style.display = DisplayStyle.Flex;
         }
 
