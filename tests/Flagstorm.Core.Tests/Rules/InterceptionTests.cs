@@ -187,5 +187,37 @@ namespace Flagstorm.Core.Tests.Rules
             Assert.That(view.KnownEnemyDefenses.Keys, Does.Not.Contain(decoyCell));
             Assert.That(view.KnownEnemyDefenses.Keys, Does.Contain(new HexCoord(3, 1)));
         }
+
+        private static Match MatchWithBlueRobotNextTo(HexCoord cell, string weaponId)
+        {
+            var match = MatchBuilder.NewPlaying();
+            match.Submit(Side.Blue, new DeployRobotCommand(PrototypeArsenal.JungleRobot, new HexCoord(1, 4)));
+            match.Submit(Side.Blue, new EndTurnCommand());
+            var built = match.Submit(Side.Red, new BuildDefenseCommand(weaponId, cell));
+            Assert.That(built.IsAccepted, Is.True, $"construir {weaponId}: {built.Reason}");
+            match.Submit(Side.Red, new EndTurnCommand());
+            return match;
+        }
+
+        [Test]
+        public void KnownEnemyDefenses_IncludesAFixedDefenseNextToAnOwnRobot()
+        {
+            var match = MatchWithBlueRobotNextTo(ShieldCell, PrototypeArsenal.DroneShield);
+            Assert.That(match.ViewFor(Side.Blue).KnownEnemyDefenses.Keys, Does.Contain(ShieldCell));
+        }
+
+        [Test]
+        public void KnownEnemyDefenses_NeverIncludesADecoyNextToAnOwnRobot()
+        {
+            var match = MatchWithBlueRobotNextTo(ShieldCell, PrototypeArsenal.Decoy);
+            Assert.That(match.ViewFor(Side.Blue).KnownEnemyDefenses.Keys, Does.Not.Contain(ShieldCell));
+        }
+
+        [Test]
+        public void KnownEnemyDefenses_ExcludesAFarFixedDefense()
+        {
+            var match = MatchWithBlueRobotNextTo(new HexCoord(3, 2), PrototypeArsenal.DroneShield);
+            Assert.That(match.ViewFor(Side.Blue).KnownEnemyDefenses.Keys, Does.Not.Contain(new HexCoord(3, 2)));
+        }
     }
 }

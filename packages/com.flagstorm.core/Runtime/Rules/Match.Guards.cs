@@ -236,6 +236,7 @@ namespace Flagstorm.Core.Rules
                     && cell.DistanceTo(guard.Post) <= radius
                     && !defender.Guards.Any(g => g.Position == cell)
                     && !defender.Defenses.ContainsKey(cell)
+                    && !defender.Flags.Contains(cell)
                     && !attacker.Robots.Any(r => r.Position == cell))
                 {
                     best = distance;

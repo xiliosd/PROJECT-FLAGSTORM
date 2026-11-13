@@ -138,5 +138,21 @@ namespace Flagstorm.Core.Tests.Rules
             second.Submit(Side.Blue, new BuildDefenseCommand(PrototypeArsenal.BeachGuard, new HexCoord(0, 4)));
             Assert.That(first.ComputeStateHash(), Is.Not.EqualTo(second.ComputeStateHash()));
         }
+
+        [Test]
+        public void Guard_NeverStepsOntoItsOwnersFlag()
+        {
+            var rules = RulesConfig.Default with { FlagsPerSide = 1 };
+            var match = MatchBuilder.NewPlaying(rules);
+            match.Submit(Side.Blue, new DeployRobotCommand(PrototypeArsenal.JungleRobot, new HexCoord(1, 0)));
+            match.Submit(Side.Blue, new EndTurnCommand());
+            var built = match.Submit(Side.Red, new BuildDefenseCommand(PrototypeArsenal.BeachGuard, new HexCoord(1, 2)));
+            Assert.That(built.IsAccepted, Is.True, built.Reason.ToString());
+            match.Submit(Side.Red, new EndTurnCommand());
+            var result = match.Submit(Side.Blue, new EndTurnCommand());
+
+            Assert.That(result.Events.OfType<GuardMoved>(), Is.Empty);
+            Assert.That(match.ViewFor(Side.Red).OwnGuards.Single().Position, Is.EqualTo(new HexCoord(1, 2)));
+        }
     }
 }

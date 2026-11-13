@@ -132,14 +132,17 @@ namespace Flagstorm.Core.Rules
         }
 
         // Un señuelo se hace pasar por bandera: nunca se expone como defensa, ni siquiera en una celda revelada.
+        // Una defensa fija se ve si su celda está revelada o si un robot propio está a una casilla (§3.10).
         private static IReadOnlyDictionary<HexCoord, DefenseInfo> KnownDefensesOf(SideState viewer, SideState owner)
         {
             var result = new SortedDictionary<HexCoord, DefenseInfo>(CellOrder.Instance);
-            foreach (var cell in viewer.RevealedEnemyCells)
+            foreach (var entry in owner.Defenses)
             {
-                if (owner.Defenses.TryGetValue(cell, out var defense) && defense.WeaponId != PrototypeArsenal.Decoy)
+                var known = viewer.RevealedEnemyCells.Contains(entry.Key)
+                    || viewer.Robots.Any(r => r.Position.DistanceTo(entry.Key) <= 1);
+                if (known && entry.Value.WeaponId != PrototypeArsenal.Decoy)
                 {
-                    result[cell] = new DefenseInfo(defense.WeaponId, defense.HitPoints);
+                    result[entry.Key] = new DefenseInfo(entry.Value.WeaponId, entry.Value.HitPoints);
                 }
             }
 
