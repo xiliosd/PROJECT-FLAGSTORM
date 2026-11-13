@@ -11,7 +11,7 @@ namespace Flagstorm.Presentation.Tests
         private const uint Seed = 7;
 
         [Test]
-        public void Setup_FirstTapsMarkFlagsThenTurrets_AndTappingAgainUnmarks()
+        public void Setup_FirstTapsMarkFlagsThenDefenses_AndTappingAgainUnmarks()
         {
             var session = MatchSession.CreateDefault(Seed);
             var cells = OwnCells(session).Take(7).ToList();
@@ -22,11 +22,83 @@ namespace Flagstorm.Presentation.Tests
             }
 
             Assert.That(session.PendingFlags.Count, Is.EqualTo(5));
-            Assert.That(session.PendingTurrets.Count, Is.EqualTo(2));
+            Assert.That(session.PendingDefenses.Count, Is.EqualTo(2));
 
             session.TapOwnCell(cells[0]);
             Assert.That(session.PendingFlags, Has.No.Member(cells[0]));
             Assert.That(session.PendingFlags.Count, Is.EqualTo(4));
+        }
+
+        [Test]
+        public void Setup_PlacesSelectedFreeDefense()
+        {
+            var session = MatchSession.CreateDefault(Seed);
+            var cells = OwnCells(session).Take(7).ToList();
+            foreach (var cell in cells.Take(5))
+            {
+                session.TapOwnCell(cell);
+            }
+
+            session.SelectSetupDefense(PrototypeArsenal.DroneShield);
+            session.TapOwnCell(cells[5]);
+            session.SelectSetupDefense(PrototypeArsenal.BeachGuard);
+            session.TapOwnCell(cells[6]);
+
+            Assert.That(session.PendingDefenses.Select(p => p.WeaponId),
+                Is.EqualTo(new[] { PrototypeArsenal.DroneShield, PrototypeArsenal.BeachGuard }));
+            Assert.That(session.ConfirmSetup().IsAccepted, Is.True);
+            Assert.That(session.View.OwnDefenses[cells[5]].WeaponId, Is.EqualTo(PrototypeArsenal.DroneShield));
+            Assert.That(session.View.OwnGuards.Single().Post, Is.EqualTo(cells[6]));
+            Assert.That(session.PendingDefenses, Is.Empty);
+        }
+
+        [Test]
+        public void Setup_CannotSelectAttackWeaponAsDefense()
+        {
+            var session = MatchSession.CreateDefault(Seed);
+            var initial = session.SelectedSetupDefenseId;
+
+            Assert.That(session.SelectSetupDefense(PrototypeArsenal.Drone), Is.False);
+            Assert.That(session.SelectSetupDefense(PrototypeArsenal.BeachRobot), Is.False);
+            Assert.That(session.SelectSetupDefense(PrototypeArsenal.Turret), Is.False, "No está en el loadout");
+            Assert.That(session.SelectedSetupDefenseId, Is.EqualTo(initial));
+            Assert.That(session.SetupDefenseOptions.Select(w => w.Id),
+                Is.EqualTo(new[] { PrototypeArsenal.DroneShield, PrototypeArsenal.BeachGuard }));
+        }
+
+        [Test]
+        public void Create_RejectsAnInvalidPlayerLoadout()
+        {
+            var unlocked = ArsenalProgression.UnlockedAfter(0);
+
+            Assert.Throws<System.ArgumentException>(
+                () => MatchSession.Create(Seed, new[] { PrototypeArsenal.Drone }, unlocked));
+        }
+
+        [Test]
+        public void Create_AiChoosesAValidLoadoutFromTheUnlockedWeapons()
+        {
+            var unlocked = ArsenalProgression.UnlockedAfter(3);
+            var playerLoadout = unlocked.Take(4).Select(w => w.Id).ToList();
+
+            var session = MatchSession.Create(Seed, playerLoadout, unlocked);
+
+            var aiLoadout = session.Match.LoadoutOf(MatchSession.AiSide);
+            Assert.That(LoadoutRules.Validate(aiLoadout, unlocked), Is.EqualTo(LoadoutError.None));
+            Assert.That(session.Match.LoadoutOf(MatchSession.HumanSide), Is.EqualTo(playerLoadout));
+        }
+
+        [Test]
+        public void TapOwnCell_WithGuardWeaponPlacesTheGuard()
+        {
+            var session = StartedSession();
+            session.SelectWeapon(PrototypeArsenal.BeachGuard);
+            var free = OwnCells(session).Skip(7).First();
+
+            var result = session.TapOwnCell(free);
+
+            Assert.That(result.IsAccepted, Is.True, result.Reason.ToString());
+            Assert.That(session.View.OwnGuards.Single().Post, Is.EqualTo(free));
         }
 
         [Test]
@@ -87,7 +159,7 @@ namespace Flagstorm.Presentation.Tests
         public void TapEnemyCell_WithDefenseWeaponIsRejected()
         {
             var session = StartedSession();
-            session.SelectWeapon(PrototypeArsenal.Turret);
+            session.SelectWeapon(PrototypeArsenal.DroneShield);
 
             var result = session.TapEnemyCell(EnemyCells(session).First());
 
@@ -98,13 +170,13 @@ namespace Flagstorm.Presentation.Tests
         public void TapOwnCell_WithDefenseWeaponBuildsIt()
         {
             var session = StartedSession();
-            session.SelectWeapon(PrototypeArsenal.Decoy);
+            session.SelectWeapon(PrototypeArsenal.DroneShield);
             var free = OwnCells(session).Skip(7).First();
 
             var result = session.TapOwnCell(free);
 
             Assert.That(result.IsAccepted, Is.True);
-            Assert.That(session.View.OwnDecoys, Has.Member(free));
+            Assert.That(session.View.OwnDefenses.ContainsKey(free), Is.True);
         }
 
         [Test]
@@ -122,7 +194,7 @@ namespace Flagstorm.Presentation.Tests
         {
             var session = StartedSession();
             var landing = session.View.EnemyIsland.CoastCells.First();
-            session.SelectWeapon(PrototypeArsenal.TrackedRobot);
+            session.SelectWeapon(PrototypeArsenal.BeachRobot);
             Assert.That(session.TapEnemyCell(landing).IsAccepted, Is.True);
             var robot = session.View.OwnRobots.Single();
 
@@ -143,7 +215,7 @@ namespace Flagstorm.Presentation.Tests
             var session = StartedSession();
             var island = session.View.EnemyIsland;
             var landing = island.CoastCells.First();
-            session.SelectWeapon(PrototypeArsenal.TrackedRobot);
+            session.SelectWeapon(PrototypeArsenal.BeachRobot);
             session.TapEnemyCell(landing);
             session.TapEnemyCell(landing);
 
@@ -160,12 +232,12 @@ namespace Flagstorm.Presentation.Tests
         public void TapEnemyCell_WithoutEnoughEnergyIsRejected()
         {
             var session = StartedSession();
-            session.SelectWeapon(PrototypeArsenal.TrackedRobot);
+            session.SelectWeapon(PrototypeArsenal.BeachRobot);
             var coast = session.View.EnemyIsland.CoastCells;
             session.TapEnemyCell(coast[0]);
 
             // El arma sigue elegida tras usarla, para repetir la acción sin volver a la barra.
-            Assert.That(session.SelectedWeaponId, Is.EqualTo(PrototypeArsenal.TrackedRobot));
+            Assert.That(session.SelectedWeaponId, Is.EqualTo(PrototypeArsenal.BeachRobot));
             var result = session.TapEnemyCell(coast[1]);
 
             Assert.That(result.Reason, Is.EqualTo(RejectionReason.NotEnoughEnergy));

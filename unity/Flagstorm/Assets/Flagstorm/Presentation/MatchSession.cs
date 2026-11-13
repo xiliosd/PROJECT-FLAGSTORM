@@ -18,7 +18,7 @@ namespace Flagstorm.Presentation
 
         private readonly BasicAiPlayer _ai;
         private readonly List<HexCoord> _pendingFlags = new List<HexCoord>();
-        private readonly List<HexCoord> _pendingTurrets = new List<HexCoord>();
+        private readonly List<DefensePlacement> _pendingDefenses = new List<DefensePlacement>();
         private int _aiCommandsThisTurn;
 
         public MatchSession(Match match, IReadOnlyList<WeaponDefinition> arsenal, BasicAiPlayer ai)
@@ -26,18 +26,30 @@ namespace Flagstorm.Presentation
             Match = match;
             Arsenal = arsenal;
             _ai = ai;
+            SelectedSetupDefenseId = SetupDefenseOptions.FirstOrDefault()?.Id;
             Match.Submit(AiSide, _ai.ChooseSetup(Match.ViewFor(AiSide)));
         }
 
         public Match Match { get; }
 
+        // Catálogo completo de la partida; el arsenal que el jugador lleva es PlayerWeapons.
         public IReadOnlyList<WeaponDefinition> Arsenal { get; }
+
+        // Armas del loadout del jugador, en el orden del catálogo.
+        public IReadOnlyList<WeaponDefinition> PlayerWeapons =>
+            Arsenal.Where(w => Match.LoadoutOf(HumanSide).Contains(w.Id)).ToList();
+
+        // Defensas del loadout que se pueden poner gratis en la preparación.
+        public IReadOnlyList<WeaponDefinition> SetupDefenseOptions =>
+            PlayerWeapons.Where(IsDefenseWeapon).ToList();
 
         public PlayerView View => Match.ViewFor(HumanSide);
 
         public IReadOnlyList<HexCoord> PendingFlags => _pendingFlags;
 
-        public IReadOnlyList<HexCoord> PendingTurrets => _pendingTurrets;
+        public IReadOnlyList<DefensePlacement> PendingDefenses => _pendingDefenses;
+
+        public string SelectedSetupDefenseId { get; private set; }
 
         public string SelectedWeaponId { get; private set; }
 
@@ -47,17 +59,47 @@ namespace Flagstorm.Presentation
 
         public bool IsHumanTurn => Match.Phase == MatchPhase.Playing && Match.CurrentSide == HumanSide;
 
-        public static MatchSession CreateDefault(uint seed)
+        public static MatchSession CreateDefault(uint seed) => Create(
+            seed,
+            ArsenalProgression.UnlockedAfter(0).Select(w => w.Id).ToList(),
+            ArsenalProgression.UnlockedAfter(0));
+
+        // La IA arma su loadout con ChooseLoadout entre las mismas armas desbloqueadas del jugador.
+        public static MatchSession Create(
+            uint seed, IReadOnlyList<string> playerLoadout, IReadOnlyList<WeaponDefinition> unlocked)
         {
+            var error = LoadoutRules.Validate(playerLoadout, unlocked);
+            if (error != LoadoutError.None)
+            {
+                throw new System.ArgumentException($"Arsenal inválido: {error}", nameof(playerLoadout));
+            }
+
+            var humanIsland = PrototypeIslands.CreateDefault();
+            var ai = new BasicAiPlayer(new SeededRandom(seed));
+            var aiLoadout = ai.ChooseLoadout(humanIsland, unlocked, LoadoutRules.MaxSlots);
             var match = new Match(
-                PrototypeIslands.CreateDefault(),
+                humanIsland,
                 PrototypeIslands.CreateDefault(),
                 RulesConfig.Default,
-                PrototypeArsenal.All);
-            return new MatchSession(match, PrototypeArsenal.All, new BasicAiPlayer(new SeededRandom(seed)));
+                PrototypeArsenal.All,
+                playerLoadout,
+                aiLoadout);
+            return new MatchSession(match, PrototypeArsenal.All, ai);
         }
 
         public WeaponDefinition WeaponById(string weaponId) => Arsenal.FirstOrDefault(w => w.Id == weaponId);
+
+        // Solo se puede elegir una defensa (escudo, antimisiles, torreta, señuelo o defensor) del loadout.
+        public bool SelectSetupDefense(string weaponId)
+        {
+            if (SetupDefenseOptions.All(w => w.Id != weaponId))
+            {
+                return false;
+            }
+
+            SelectedSetupDefenseId = weaponId;
+            return true;
+        }
 
         // Devuelve null si el toque solo cambió la selección; un resultado si se intentó un comando.
         public CommandResult TapOwnCell(HexCoord cell)
@@ -73,18 +115,18 @@ namespace Flagstorm.Presentation
                 return null;
             }
 
-            return weapon.Category == WeaponCategory.Defend
+            return IsDefenseWeapon(weapon)
                 ? Match.Submit(HumanSide, new BuildDefenseCommand(weapon.Id, cell))
                 : CommandResult.Rejected(RejectionReason.OutOfIsland);
         }
 
         public CommandResult ConfirmSetup()
         {
-            var result = Match.Submit(HumanSide, new SetupCommand(_pendingFlags.ToList(), _pendingTurrets.ToList()));
+            var result = Match.Submit(HumanSide, new SetupCommand(_pendingFlags.ToList(), _pendingDefenses.ToList()));
             if (result.IsAccepted)
             {
                 _pendingFlags.Clear();
-                _pendingTurrets.Clear();
+                _pendingDefenses.Clear();
             }
 
             return result;
@@ -127,6 +169,7 @@ namespace Flagstorm.Presentation
                 case WeaponCategory.Capture:
                     return Match.Submit(HumanSide, new DeployRobotCommand(weapon.Id, cell));
                 case WeaponCategory.Defend:
+                case WeaponCategory.Guard:
                     return CommandResult.Rejected(RejectionReason.OutOfIsland);
                 default:
                     return null;
@@ -156,9 +199,12 @@ namespace Flagstorm.Presentation
             return result.IsAccepted ? result : Match.Submit(AiSide, new EndTurnCommand());
         }
 
+        private static bool IsDefenseWeapon(WeaponDefinition weapon) =>
+            weapon.Category == WeaponCategory.Defend || weapon.Category == WeaponCategory.Guard;
+
         private CommandResult ToggleSetupCell(HexCoord cell)
         {
-            if (_pendingFlags.Remove(cell) || _pendingTurrets.Remove(cell))
+            if (_pendingFlags.Remove(cell) || _pendingDefenses.RemoveAll(p => p.Cell == cell) > 0)
             {
                 return null;
             }
@@ -174,9 +220,9 @@ namespace Flagstorm.Presentation
                 return null;
             }
 
-            if (_pendingTurrets.Count < Match.Rules.InitialFreeTurrets)
+            if (SelectedSetupDefenseId != null && _pendingDefenses.Count < Match.Rules.InitialFreeDefenses)
             {
-                _pendingTurrets.Add(cell);
+                _pendingDefenses.Add(new DefensePlacement(SelectedSetupDefenseId, cell));
                 return null;
             }
 

@@ -1,4 +1,6 @@
 using System;
+using System.Linq;
+using Flagstorm.Core.Arsenal;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -14,6 +16,21 @@ namespace Flagstorm.Presentation.Tests
             {
                 AssertFacesUp(HexMeshFactory.CreateMarker(shape, 1f));
             }
+        }
+
+        [Test]
+        public void EveryDefenseKindHasItsOwnShape()
+        {
+            var shapes = PrototypeArsenal.All
+                .Where(w => w.Category == WeaponCategory.Defend)
+                .Select(w => MarkerShapes.ForWeapon(w.Id))
+                .ToList();
+
+            Assert.That(shapes, Is.Unique);
+            Assert.That(MarkerShapes.ForWeapon(PrototypeArsenal.DroneShield), Is.EqualTo(MarkerShape.HollowHexagon));
+            Assert.That(MarkerShapes.ForWeapon(PrototypeArsenal.AntiMissile), Is.EqualTo(MarkerShape.HollowTriangle));
+            Assert.That(MarkerShapes.ForWeapon(PrototypeArsenal.BeachGuard), Is.EqualTo(MarkerShape.Pentagon));
+            Assert.That(MarkerShapes.ForWeapon(PrototypeArsenal.MagmaGuard), Is.EqualTo(MarkerShape.Pentagon));
         }
 
         [Test]

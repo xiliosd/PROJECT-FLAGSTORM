@@ -32,20 +32,28 @@ namespace Flagstorm.Presentation.PlayModeTests
             Assert.That(session.Match.Phase, Is.EqualTo(MatchPhase.Setup));
             yield return Capture("01-preparacion");
 
-            foreach (var cell in session.View.OwnIsland.InteriorCells.Take(7))
+            // Loadout inicial: dron, escudo, robot anfibio y defensor. Se ponen 5 banderas, el escudo y el defensor.
+            var setupCells = session.View.OwnIsland.InteriorCells.Take(7).ToList();
+            foreach (var cell in setupCells.Take(6))
             {
                 controller.OnCellTapped(controller.OwnIsland, cell);
             }
 
+            controller.OnSetupDefenseSelected(PrototypeArsenal.BeachGuard);
+            controller.OnCellTapped(controller.OwnIsland, setupCells[6]);
+            Assert.That(session.PendingDefenses.Select(p => p.WeaponId),
+                Is.EqualTo(new[] { PrototypeArsenal.DroneShield, PrototypeArsenal.BeachGuard }));
             yield return Capture("02-banderas-marcadas");
             controller.ConfirmSetup();
             Assert.That(session.IsHumanTurn, Is.True, "Tras confirmar, empieza el jugador");
+            Assert.That(session.View.OwnGuards, Has.Count.EqualTo(1), "El defensor gratis queda en la isla");
+            yield return Capture("02b-defensas-colocadas");
 
             controller.OnWeaponSelected(PrototypeArsenal.Drone);
             controller.OnCellTapped(controller.EnemyIsland, session.View.EnemyIsland.InteriorCells[4]);
             Assert.That(session.View.RevealedEnemyCells, Is.Not.Empty, "El dron revela casillas");
 
-            controller.OnWeaponSelected(PrototypeArsenal.TrackedRobot);
+            controller.OnWeaponSelected(PrototypeArsenal.BeachRobot);
             controller.OnCellTapped(controller.EnemyIsland, session.View.EnemyIsland.CoastCells[0]);
             Assert.That(session.View.OwnRobots, Is.Not.Empty, "El robot desembarca");
             controller.OnCellTapped(controller.EnemyIsland, session.View.EnemyIsland.CoastCells[0]);

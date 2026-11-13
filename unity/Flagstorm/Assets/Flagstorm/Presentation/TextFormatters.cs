@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Flagstorm.Core.Arsenal;
 using Flagstorm.Core.Rules;
 
@@ -28,7 +30,8 @@ namespace Flagstorm.Presentation
                 case RejectionReason.WrongPhase: return "Eso no se puede hacer en esta fase";
                 case RejectionReason.NotYourTurn: return "Espera tu turno";
                 case RejectionReason.MatchFinished: return "La partida ya terminó";
-                case RejectionReason.InvalidSetup: return "Coloca exactamente 5 banderas y hasta 2 torretas en tu isla";
+                case RejectionReason.InvalidSetup:
+                    return "Coloca exactamente 5 banderas y hasta 2 defensas gratis en tu isla";
                 case RejectionReason.OutOfIsland: return "Esa casilla no es válida para esta acción";
                 case RejectionReason.NotEnoughEnergy: return "No tienes energía suficiente";
                 case RejectionReason.UnknownWeapon: return "Arma desconocida";
@@ -37,6 +40,7 @@ namespace Flagstorm.Presentation
                 case RejectionReason.InvalidPath: return "El robot no puede llegar hasta ahí este turno";
                 case RejectionReason.UnknownRobot: return "Ese robot ya no existe";
                 case RejectionReason.CellOccupied: return "Esa casilla está ocupada";
+                case RejectionReason.NotInLoadout: return "Esa arma no está en tu arsenal de la partida";
                 default: return string.Empty;
             }
         }
@@ -62,10 +66,10 @@ namespace Flagstorm.Presentation
                         ? $"Disparaste: {NameOf(impact.WeaponId)}"
                         : $"¡Impacto rival en tu isla! ({NameOf(impact.WeaponId)})";
                 case DefenseDamaged damaged:
-                    return $"{Owner(damaged.Owner, viewer)} {NameOf(damaged.WeaponId)} "
+                    return $"{DefenseOf(damaged.Owner, viewer)} ({NameOf(damaged.WeaponId)}) "
                         + $"quedó con {damaged.RemainingHitPoints} PV";
                 case DefenseDestroyed destroyed:
-                    return $"{Owner(destroyed.Owner, viewer)} {NameOf(destroyed.WeaponId)} fue destruida";
+                    return $"{DefenseOf(destroyed.Owner, viewer)} ({NameOf(destroyed.WeaponId)}) fue destruida";
                 case RobotDeployed deployed:
                     return deployed.Owner == viewer
                         ? $"Desembarcaste: {NameOf(deployed.WeaponId)}"
@@ -74,12 +78,14 @@ namespace Flagstorm.Presentation
                     return moved.Owner == viewer ? $"Tu robot avanzó {moved.Path.Count} casillas" : null;
                 case FlagCaptured captured:
                     return captured.By == viewer
-                        ? $"¡Capturaste una bandera! ({captured.TotalCaptured}/{flagsPerSide})"
-                        : $"El rival capturó una de tus banderas ({captured.TotalCaptured}/{flagsPerSide})";
+                        ? $"¡Tu {NameOf(captured.WeaponId)} capturó una bandera! "
+                            + $"({captured.TotalCaptured}/{flagsPerSide})"
+                        : $"El {NameOf(captured.WeaponId)} rival capturó una de tus banderas "
+                            + $"({captured.TotalCaptured}/{flagsPerSide})";
                 case DecoyExposed exposed:
                     return exposed.By == viewer ? "Era un señuelo" : "El rival descubrió uno de tus señuelos";
                 case MatchWon won:
-                    return won.Winner == viewer ? "¡Victoria!" : "Derrota";
+                    return EndReasonFormatter.Format(won.Winner, viewer, flagsPerSide);
                 case DefenseBuilt built:
                     return built.Owner == viewer ? $"Construiste: {NameOf(built.WeaponId)}" : null;
                 case TurretFired fired:
@@ -88,6 +94,34 @@ namespace Flagstorm.Presentation
                         : $"Una torreta rival dañó a tu robot (−{fired.Damage} PV)";
                 case RobotDestroyed destroyedRobot:
                     return destroyedRobot.Owner == viewer ? "Perdiste un robot" : "Destruiste un robot rival";
+                case DroneShotDown shotDown:
+                    return shotDown.By == viewer
+                        ? "Tu dron fue derribado por un escudo"
+                        : "Tu escudo derribó un dron rival";
+                case MissileIntercepted intercepted:
+                    return intercepted.By == viewer
+                        ? $"Tu {NameOf(intercepted.WeaponId)} fue interceptado por unos antimisiles"
+                        : $"Tus antimisiles interceptaron un {NameOf(intercepted.WeaponId)} rival "
+                            + $"(quedan {intercepted.RemainingHitPoints} PV)";
+                case GuardPlaced placed:
+                    return placed.Owner == viewer
+                        ? $"Colocaste: {NameOf(placed.WeaponId)}"
+                        : "El rival colocó un defensor";
+                case GuardMoved guardMoved:
+                    return guardMoved.Owner == viewer ? "Tu defensor avanzó" : "Un defensor rival avanzó";
+                case GuardDamaged guardDamaged:
+                    return $"{(guardDamaged.Owner == viewer ? "Tu defensor" : "Un defensor rival")} "
+                        + $"quedó con {guardDamaged.RemainingHitPoints} PV";
+                case GuardDestroyed guardDestroyed:
+                    return guardDestroyed.Owner == viewer ? "Perdiste un defensor" : "Destruiste un defensor rival";
+                case RobotsClashed clash:
+                    return clash.Attacker == viewer
+                        ? $"Choque: tu robot −{clash.DamageToAttacker} PV, defensor −{clash.DamageToGuard} PV"
+                        : $"Choque: tu defensor −{clash.DamageToGuard} PV, robot rival −{clash.DamageToAttacker} PV";
+                case RobotHitDefense hit:
+                    return hit.Attacker == viewer
+                        ? $"Tu robot golpeó una defensa rival (−{hit.Damage} PV)"
+                        : $"Un robot rival golpeó una de tus defensas (−{hit.Damage} PV)";
                 case SetupCompleted setup:
                     return setup.Side == viewer ? "Tus banderas están escondidas" : "El rival escondió sus banderas";
                 case EnergyChanged _:
@@ -97,7 +131,8 @@ namespace Flagstorm.Presentation
             }
         }
 
-        private static string Owner(Side owner, Side viewer) => owner == viewer ? "Tu" : "La";
+        private static string DefenseOf(Side owner, Side viewer) =>
+            owner == viewer ? "Tu defensa" : "Una defensa rival";
 
         private static string NameOf(string weaponId)
         {
@@ -109,7 +144,52 @@ namespace Flagstorm.Presentation
                 }
             }
 
-            return weaponId;
+            return weaponId ?? "robot";
+        }
+    }
+
+    public static class EndReasonFormatter
+    {
+        // La única forma de ganar es capturar todas las banderas rivales, así que esa es también la causa.
+        public static string Format(Side winner, Side viewer, int flagsPerSide) =>
+            winner == viewer
+                ? $"¡Victoria! Capturaste las {flagsPerSide} banderas rivales"
+                : $"Derrota: el rival capturó tus {flagsPerSide} banderas";
+    }
+
+    // El núcleo emite todos los eventos (para repeticiones); el registro del jugador solo cuenta lo que él ve.
+    public static class EventVisibility
+    {
+        public static IReadOnlyList<IMatchEvent> Filter(
+            IEnumerable<IMatchEvent> events, Side viewer, IEnumerable<int> knownEnemyGuardIds)
+        {
+            var all = events.ToList();
+            var known = new HashSet<int>(knownEnemyGuardIds);
+
+            // Un defensor que chocó con un robot del jugador queda a la vista aunque luego caiga destruido.
+            foreach (var clash in all.OfType<RobotsClashed>().Where(c => c.Attacker == viewer))
+            {
+                known.Add(clash.GuardId);
+            }
+
+            return all.Where(e => IsVisible(e, viewer, known)).ToList();
+        }
+
+        private static bool IsVisible(IMatchEvent matchEvent, Side viewer, ISet<int> knownEnemyGuardIds)
+        {
+            switch (matchEvent)
+            {
+                case GuardPlaced placed:
+                    return placed.Owner == viewer;
+                case GuardMoved moved:
+                    return moved.Owner == viewer || knownEnemyGuardIds.Contains(moved.RobotId);
+                case GuardDamaged damaged:
+                    return damaged.Owner == viewer || knownEnemyGuardIds.Contains(damaged.RobotId);
+                case GuardDestroyed destroyed:
+                    return destroyed.Owner == viewer || knownEnemyGuardIds.Contains(destroyed.RobotId);
+                default:
+                    return true;
+            }
         }
     }
 
@@ -122,8 +202,8 @@ namespace Flagstorm.Presentation
             if (match.Phase == MatchPhase.Setup)
             {
                 return $"Toca tu isla (abajo) para esconder banderas {session.PendingFlags.Count}/"
-                    + $"{match.Rules.FlagsPerSide} y luego poner torretas {session.PendingTurrets.Count}/"
-                    + $"{match.Rules.InitialFreeTurrets}. Después pulsa «Confirmar banderas».";
+                    + $"{match.Rules.FlagsPerSide} y luego poner la defensa elegida {session.PendingDefenses.Count}/"
+                    + $"{match.Rules.InitialFreeDefenses}. Después pulsa «Confirmar banderas».";
             }
 
             if (match.Phase == MatchPhase.Finished)
@@ -152,6 +232,8 @@ namespace Flagstorm.Presentation
                     return "Toca una casilla de la costa rival para desembarcar";
                 case WeaponCategory.Defend:
                     return "Toca una casilla libre de tu isla para construir";
+                case WeaponCategory.Guard:
+                    return "Toca una casilla libre de tu isla para colocar el defensor";
                 default:
                     return "Elige un arma abajo o toca uno de tus robots";
             }

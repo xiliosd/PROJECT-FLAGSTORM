@@ -1,5 +1,7 @@
 using System.Collections;
+using System.Collections.Generic;
 using System.Linq;
+using Flagstorm.Core.Arsenal;
 using Flagstorm.Core.Map;
 using Flagstorm.Core.Rules;
 using UnityEngine;
@@ -17,6 +19,9 @@ namespace Flagstorm.Presentation
 
         // Las celdas rivales sin explorar se ven tenues (25 %) sobre el océano.
         private const float FogVisibility = 0.25f;
+
+        // Las zonas de escudos, antimisiles y defensores propios se tiñen un 15 % con el color del bando.
+        private const float ZoneTint = 0.15f;
 
         // Fracción de pantalla que ocupan los paneles del HUD arriba y abajo.
         private const float HudTopFraction = 0.2f;
@@ -63,7 +68,8 @@ namespace Flagstorm.Presentation
                 "Isla rival", view.EnemyIsland, new Vector3(0f, 0f, offset), HoloPalette.EnemyColor);
 
             _document = GetComponent<UIDocument>();
-            _hud = new HudView(_document.rootVisualElement, _session.Arsenal);
+            _hud = new HudView(_document.rootVisualElement, _session.PlayerWeapons);
+            _hud.SetupDefenseSelected += OnSetupDefenseSelected;
             _hud.WeaponSelected += OnWeaponSelected;
             _hud.ConfirmSetupClicked += ConfirmSetup;
             _hud.EndTurnClicked += EndTurn;
@@ -92,6 +98,12 @@ namespace Flagstorm.Presentation
         internal void ConfirmSetup() => Apply(_session.ConfirmSetup());
 
         internal void EndTurn() => Apply(_session.EndTurn());
+
+        internal void OnSetupDefenseSelected(string weaponId)
+        {
+            _session.SelectSetupDefense(weaponId);
+            Refresh();
+        }
 
         internal void OnWeaponSelected(string weaponId)
         {
@@ -217,7 +229,10 @@ namespace Flagstorm.Presentation
                     _hud.ShowToast(RejectionTextFormatter.Format(result.Reason));
                 }
 
-                foreach (var matchEvent in result.Events)
+                var view = _session.View;
+                var visibleEvents = EventVisibility.Filter(
+                    result.Events, MatchSession.HumanSide, view.KnownEnemyGuards.Select(g => g.RobotId));
+                foreach (var matchEvent in visibleEvents)
                 {
                     _hud.AddLog(EventTextFormatter.Format(
                         matchEvent, MatchSession.HumanSide, _session.Match.Rules.FlagsPerSide));
@@ -235,6 +250,7 @@ namespace Flagstorm.Presentation
             var setup = match.Phase == MatchPhase.Setup;
 
             _hud.SetSetupMode(setup);
+            _hud.SetSetupDefenseState(_session.SelectedSetupDefenseId);
             _hud.SetInteractive(_session.IsHumanTurn);
             _hud.SetEnergy(view.Energy, rules.MaxEnergy);
             var flagsLeft = rules.FlagsPerSide - view.FlagsLostByViewer;
@@ -249,7 +265,8 @@ namespace Flagstorm.Presentation
 
             if (match.Phase == MatchPhase.Finished)
             {
-                _hud.ShowEnd(match.Winner == MatchSession.HumanSide ? "¡Victoria!" : "Derrota");
+                _hud.ShowEnd(EndReasonFormatter.Format(
+                    match.Winner.Value, MatchSession.HumanSide, rules.FlagsPerSide));
             }
         }
 
@@ -272,7 +289,7 @@ namespace Flagstorm.Presentation
             var hovered = _hoveredEnemyCell.HasValue && view.EnemyIsland.Contains(_hoveredEnemyCell.Value)
                 ? view.EnemyIsland.TerrainAt(_hoveredEnemyCell.Value)
                 : (TerrainType?)null;
-            foreach (var weapon in _session.Arsenal)
+            foreach (var weapon in _session.PlayerWeapons)
             {
                 var modifier = hovered.HasValue
                     ? ModifierLabelFormatter.Format(weapon.ModifierPercentOn(hovered.Value))
@@ -286,12 +303,36 @@ namespace Flagstorm.Presentation
         {
             var island = _ownIsland;
             island.ClearMarkers();
-            foreach (var cell in view.OwnIsland.Cells)
+            var own = HoloPalette.OwnColor;
+
+            // Escudos, antimisiles y defensores propios tiñen su zona con un 15 % del color del bando.
+            var zones = new HashSet<HexCoord>();
+            if (setup)
             {
-                island.SetCellColor(cell.Key, HoloPalette.TerrainColor(cell.Value));
+                foreach (var placement in _session.PendingDefenses)
+                {
+                    AddZone(zones, view.OwnIsland, placement.WeaponId, placement.Cell);
+                }
+            }
+            else
+            {
+                foreach (var defense in view.OwnDefenses)
+                {
+                    AddZone(zones, view.OwnIsland, defense.Value.WeaponId, defense.Key);
+                }
+
+                foreach (var guard in view.OwnGuards)
+                {
+                    AddZone(zones, view.OwnIsland, guard.WeaponId, guard.Post);
+                }
             }
 
-            var own = HoloPalette.OwnColor;
+            foreach (var cell in view.OwnIsland.Cells)
+            {
+                var terrain = HoloPalette.TerrainColor(cell.Value);
+                island.SetCellColor(cell.Key, zones.Contains(cell.Key) ? Color.Lerp(terrain, own, ZoneTint) : terrain);
+            }
+
             var flags = setup ? _session.PendingFlags : view.OwnFlags;
             foreach (var flag in flags)
             {
@@ -300,23 +341,27 @@ namespace Flagstorm.Presentation
 
             if (setup)
             {
-                foreach (var turret in _session.PendingTurrets)
+                foreach (var placement in _session.PendingDefenses)
                 {
-                    island.AddMarker(turret, MarkerShape.Square, own);
+                    island.AddMarker(placement.Cell, MarkerShapes.ForWeapon(placement.WeaponId), own);
                 }
 
                 return;
             }
 
-            foreach (var turret in view.OwnTurrets)
+            foreach (var defense in view.OwnDefenses)
             {
-                island.AddMarker(turret.Key, MarkerShape.Square, own);
-                _labels.AddValueLabel(island.WorldOf(turret.Key), $"{turret.Value} PV", own);
+                island.AddMarker(defense.Key, MarkerShapes.ForWeapon(defense.Value.WeaponId), own);
+                if (defense.Value.WeaponId != PrototypeArsenal.Decoy)
+                {
+                    _labels.AddValueLabel(island.WorldOf(defense.Key), $"{defense.Value.HitPoints} PV", own);
+                }
             }
 
-            foreach (var decoy in view.OwnDecoys)
+            foreach (var guard in view.OwnGuards)
             {
-                island.AddMarker(decoy, MarkerShape.HollowDiamond, own);
+                island.AddMarker(guard.Position, MarkerShape.Pentagon, own);
+                _labels.AddValueLabel(island.WorldOf(guard.Position), $"{guard.HitPoints} PV", own);
             }
 
             foreach (var robot in view.EnemyRobotsOnOwnIsland)
@@ -324,6 +369,20 @@ namespace Flagstorm.Presentation
                 island.AddMarker(robot.Position, MarkerShape.Circle, HoloPalette.EnemyColor);
                 _labels.AddValueLabel(
                     island.WorldOf(robot.Position), $"{robot.HitPoints} PV", HoloPalette.EnemyColor);
+            }
+        }
+
+        private static void AddZone(HashSet<HexCoord> zones, IslandMap island, string weaponId, HexCoord center)
+        {
+            var weapon = PrototypeArsenal.Get(weaponId);
+            if (!MarkerShapes.HasZone(weapon))
+            {
+                return;
+            }
+
+            foreach (var cell in island.Cells.Keys.Where(c => c.DistanceTo(center) <= weapon.Radius))
+            {
+                zones.Add(cell);
             }
         }
 
@@ -346,10 +405,16 @@ namespace Flagstorm.Presentation
                 island.AddMarker(signal, MarkerShape.Diamond, enemy);
             }
 
-            foreach (var turret in view.KnownEnemyTurrets)
+            foreach (var defense in view.KnownEnemyDefenses)
             {
-                island.AddMarker(turret.Key, MarkerShape.Square, enemy);
-                _labels.AddValueLabel(island.WorldOf(turret.Key), $"{turret.Value} PV", enemy);
+                island.AddMarker(defense.Key, MarkerShapes.ForWeapon(defense.Value.WeaponId), enemy);
+                _labels.AddValueLabel(island.WorldOf(defense.Key), $"{defense.Value.HitPoints} PV", enemy);
+            }
+
+            foreach (var guard in view.KnownEnemyGuards)
+            {
+                island.AddMarker(guard.Position, MarkerShape.Pentagon, enemy);
+                _labels.AddValueLabel(island.WorldOf(guard.Position), $"{guard.HitPoints} PV", enemy);
             }
 
             foreach (var robot in view.OwnRobots)

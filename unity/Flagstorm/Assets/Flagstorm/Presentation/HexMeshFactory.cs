@@ -1,3 +1,4 @@
+using Flagstorm.Core.Arsenal;
 using UnityEngine;
 
 namespace Flagstorm.Presentation
@@ -22,6 +23,12 @@ namespace Flagstorm.Presentation
                     return CreatePolygon("Flag", size, 3, 90f);
                 case MarkerShape.Circle:
                     return CreatePolygon("Circle", size * 0.8f, CircleSides, 0f);
+                case MarkerShape.HollowHexagon:
+                    return CreateRing("HollowHexagon", size, size * 0.6f, 6, 0f);
+                case MarkerShape.HollowTriangle:
+                    return CreateRing("HollowTriangle", size, size * 0.5f, 3, 90f);
+                case MarkerShape.Pentagon:
+                    return CreatePolygon("Pentagon", size * 0.9f, 5, 90f);
                 case MarkerShape.HollowDiamond:
                     return CreateRing("HollowDiamond", size, size * 0.6f, 4, 0f);
                 default:
@@ -102,6 +109,41 @@ namespace Flagstorm.Presentation
         Flag,
         Circle,
         HollowDiamond,
+        HollowHexagon,
+        HollowTriangle,
+        Pentagon,
         Ring,
+    }
+
+    // Forma de cada defensa en el tablero: escudo, antimisiles, torreta, señuelo y defensores se distinguen sin color.
+    public static class MarkerShapes
+    {
+        public static MarkerShape ForWeapon(string weaponId)
+        {
+            if (weaponId == PrototypeArsenal.Decoy)
+            {
+                return MarkerShape.HollowDiamond;
+            }
+
+            var weapon = PrototypeArsenal.Get(weaponId);
+            if (weapon.Category == WeaponCategory.Guard)
+            {
+                return MarkerShape.Pentagon;
+            }
+
+            switch (weapon.Intercepts)
+            {
+                case WeaponCategory.Reveal:
+                    return MarkerShape.HollowHexagon;
+                case WeaponCategory.Destroy:
+                    return MarkerShape.HollowTriangle;
+                default:
+                    return MarkerShape.Square;
+            }
+        }
+
+        // Escudos, antimisiles y defensores cubren una zona; se tiñe para mostrar hasta dónde llegan.
+        public static bool HasZone(WeaponDefinition weapon) =>
+            weapon.Intercepts.HasValue || weapon.Category == WeaponCategory.Guard;
     }
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Flagstorm.Core.Arsenal;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -20,6 +21,8 @@ namespace Flagstorm.Presentation
         private readonly Label _toast;
         private readonly Label _log;
         private readonly VisualElement _weapons;
+        private readonly VisualElement _setupDefenses;
+        private readonly Dictionary<string, Button> _setupDefenseButtons = new Dictionary<string, Button>();
         private readonly Button _confirmSetup;
         private readonly Button _endTurn;
         private readonly VisualElement _endPanel;
@@ -28,6 +31,7 @@ namespace Flagstorm.Presentation
         private readonly List<string> _logLines = new List<string>();
         private float _toastUntil;
 
+        // `arsenal` es el loadout del jugador: solo esas armas tienen botón.
         public HudView(VisualElement root, IReadOnlyList<WeaponDefinition> arsenal)
         {
             _root = root;
@@ -69,6 +73,15 @@ namespace Flagstorm.Presentation
                 _weaponButtons[id] = button;
             }
 
+            _setupDefenses = Row(bottom);
+            _setupDefenses.style.flexWrap = Wrap.Wrap;
+            foreach (var weapon in arsenal.Where(IsSetupDefense))
+            {
+                var id = weapon.Id;
+                _setupDefenseButtons[id] = AddButton(
+                    _setupDefenses, Caption(weapon, string.Empty), () => SetupDefenseSelected?.Invoke(id));
+            }
+
             var actions = Row(bottom);
             _confirmSetup = AddButton(actions, "Confirmar banderas", () => ConfirmSetupClicked?.Invoke());
             _endTurn = AddButton(actions, "Terminar turno", () => EndTurnClicked?.Invoke());
@@ -83,12 +96,17 @@ namespace Flagstorm.Presentation
             _endPanel.style.justifyContent = Justify.Center;
             _endPanel.style.alignItems = Align.Center;
             _endPanel.style.display = DisplayStyle.None;
-            _endTitle = Text(_endPanel, 72, HoloPalette.OwnColor);
+            _endTitle = Text(_endPanel, 56, HoloPalette.OwnColor);
+            _endTitle.style.unityTextAlign = TextAnchor.MiddleCenter;
+            _endTitle.style.marginLeft = 24;
+            _endTitle.style.marginRight = 24;
             AddButton(_endPanel, "Jugar de nuevo", () => RestartClicked?.Invoke());
             root.Add(_endPanel);
         }
 
         public event Action<string> WeaponSelected;
+
+        public event Action<string> SetupDefenseSelected;
 
         public event Action ConfirmSetupClicked;
 
@@ -114,6 +132,7 @@ namespace Flagstorm.Presentation
         {
             _confirmSetup.style.display = setup ? DisplayStyle.Flex : DisplayStyle.None;
             _weapons.style.display = setup ? DisplayStyle.None : DisplayStyle.Flex;
+            _setupDefenses.style.display = setup ? DisplayStyle.Flex : DisplayStyle.None;
             _endTurn.style.display = setup ? DisplayStyle.None : DisplayStyle.Flex;
         }
 
@@ -127,6 +146,22 @@ namespace Flagstorm.Presentation
         {
             var button = _weaponButtons[weapon.Id];
             button.text = Caption(weapon, modifier);
+            Highlight(button, selected, affordable);
+        }
+
+        public void SetSetupDefenseState(string selectedId)
+        {
+            foreach (var pair in _setupDefenseButtons)
+            {
+                Highlight(pair.Value, pair.Key == selectedId, true);
+            }
+        }
+
+        private static bool IsSetupDefense(WeaponDefinition weapon) =>
+            weapon.Category == WeaponCategory.Defend || weapon.Category == WeaponCategory.Guard;
+
+        private static void Highlight(Button button, bool selected, bool affordable)
+        {
             button.SetEnabled(affordable);
 
             // Los estilos en línea anulan el aspecto "deshabilitado" del tema; se atenúa a mano.
@@ -165,9 +200,9 @@ namespace Flagstorm.Presentation
             _toastUntil = Time.unscaledTime + 2f;
         }
 
-        public void ShowEnd(string title)
+        public void ShowEnd(string reason)
         {
-            _endTitle.text = title;
+            _endTitle.text = reason;
             _endPanel.style.display = DisplayStyle.Flex;
         }
 
