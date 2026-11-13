@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using System.Linq;
 using Flagstorm.Core.Arsenal;
 using Flagstorm.Core.Map;
@@ -44,6 +43,8 @@ namespace Flagstorm.Core.Tests.Rules
             Assert.That(clash.AttackerId, Is.EqualTo(robotId));
             Assert.That(clash.DamageToGuard, Is.EqualTo(2));
             Assert.That(clash.DamageToAttacker, Is.EqualTo(2));
+            Assert.That(clash.AttackerHitPointsLeft, Is.EqualTo(2));
+            Assert.That(clash.GuardHitPointsLeft, Is.EqualTo(2));
             Assert.That(RedGuard(match).HitPoints, Is.EqualTo(2));
             Assert.That(match.ViewFor(Side.Blue).OwnRobots.Single().HitPoints, Is.EqualTo(2));
         }
@@ -72,40 +73,133 @@ namespace Flagstorm.Core.Tests.Rules
         [Test]
         public void TwoGuardsAgainstOneRobot_IsDeterministic()
         {
-            var forward = PlayTwoGuardsAgainstOneRobot(new[] { IceCell, RockCell });
-            var reversed = PlayTwoGuardsAgainstOneRobot(new[] { RockCell, IceCell });
-            Assert.That(reversed.EventNames, Is.EqualTo(forward.EventNames));
-            Assert.That(reversed.GuardHitPoints, Is.EqualTo(forward.GuardHitPoints));
-            Assert.That(reversed.RobotAlive, Is.EqualTo(forward.RobotAlive));
-            Assert.That(forward.RobotAlive, Is.False);
-            Assert.That(forward.GuardHitPoints, Is.EqualTo(new[] { 2, 4 }));
+            // Defensores asimétricos: si el objetivo dependiera del orden, el daño recibido cambiaría.
+            foreach (var order in new[]
+            {
+                new[] { PrototypeArsenal.SnowGuard, PrototypeArsenal.BeachGuard },
+                new[] { PrototypeArsenal.BeachGuard, PrototypeArsenal.SnowGuard },
+            })
+            {
+                var match = MatchBuilder.NewPlaying();
+                match.Submit(Side.Blue, new EndTurnCommand());
+                foreach (var weapon in order)
+                {
+                    var cell = weapon == PrototypeArsenal.SnowGuard ? IceCell : RockCell;
+                    AssertAccepted(match.Submit(Side.Red, new BuildDefenseCommand(weapon, cell)));
+                }
+
+                match.Submit(Side.Red, new EndTurnCommand());
+                var robotId = DeployBlue(match, PrototypeArsenal.JungleRobot, new HexCoord(1, 4));
+                var guardIds = match.ViewFor(Side.Red).OwnGuards.Select(g => g.RobotId).ToList();
+                var end = match.Submit(Side.Blue, new EndTurnCommand());
+                var clashes = end.Events.OfType<RobotsClashed>().ToList();
+                Assert.That(clashes, Has.Count.EqualTo(2), "ambos defensores golpean al robot");
+                Assert.That(clashes.Single(c => c.DamageToGuard > 0).GuardId, Is.EqualTo(guardIds.Min()));
+                Assert.That(clashes.Sum(c => c.DamageToAttacker), Is.EqualTo(5), "3 en Hielo + 2 en Roca");
+                Assert.That(end.Events.OfType<RobotDestroyed>().Single().RobotId, Is.EqualTo(robotId));
+            }
         }
 
-        [Test]
-        public void TwoGuardsAgainstOneRobot_SameOrderTwice_ReachesSameHash()
+        private static int DeployBlue(Match match, string weapon, HexCoord cell)
         {
-            var first = PlayTwoGuardsAgainstOneRobot(new[] { IceCell, RockCell });
-            var second = PlayTwoGuardsAgainstOneRobot(new[] { IceCell, RockCell });
-            Assert.That(second.Hash, Is.EqualTo(first.Hash));
+            var result = match.Submit(Side.Blue, new DeployRobotCommand(weapon, cell));
+            AssertAccepted(result);
+            return result.Events.OfType<RobotDeployed>().Single().RobotId;
         }
 
-        private static (List<string> EventNames, List<int> GuardHitPoints, bool RobotAlive, string Hash)
-            PlayTwoGuardsAgainstOneRobot(HexCoord[] placementOrder)
+        // Azul termina un turno sin robots, rojo construye y azul queda listo para desembarcar.
+        private static Match NewBlueToDeploy(params (string Weapon, HexCoord Cell)[] redBuilds)
         {
             var match = MatchBuilder.NewPlaying();
             match.Submit(Side.Blue, new EndTurnCommand());
-            foreach (var cell in placementOrder)
+            foreach (var build in redBuilds)
             {
-                AssertAccepted(match.Submit(Side.Red, new BuildDefenseCommand(PrototypeArsenal.BeachGuard, cell)));
+                AssertAccepted(match.Submit(Side.Red, new BuildDefenseCommand(build.Weapon, build.Cell)));
             }
 
             match.Submit(Side.Red, new EndTurnCommand());
-            AssertAccepted(match.Submit(
-                Side.Blue, new DeployRobotCommand(PrototypeArsenal.JungleRobot, new HexCoord(1, 4))));
+            return match;
+        }
+
+        [Test]
+        public void GuardBetweenTwoRobots_HitsLowerIdAndBothRobotsHitGuard()
+        {
+            var match = NewBlueToDeploy((PrototypeArsenal.BeachGuard, RockCell));
+            var first = DeployBlue(match, PrototypeArsenal.JungleRobot, new HexCoord(0, 4));
+            var second = DeployBlue(match, PrototypeArsenal.JungleRobot, new HexCoord(1, 4));
+            var clashes = match.Submit(Side.Blue, new EndTurnCommand()).Events.OfType<RobotsClashed>().ToList();
+            Assert.That(clashes.Select(c => c.AttackerId), Is.EqualTo(new[] { first, second }));
+            Assert.That(clashes[0].DamageToAttacker, Is.EqualTo(2), "el defensor golpea al de menor id");
+            Assert.That(clashes[1].DamageToAttacker, Is.EqualTo(0));
+            Assert.That(clashes.Select(c => c.DamageToGuard), Is.EqualTo(new[] { 2, 2 }));
+            Assert.That(clashes[1].GuardHitPointsLeft, Is.EqualTo(0));
+        }
+
+        [Test]
+        public void RobotThatClashed_DoesNotAlsoHitAdjacentFixedDefense()
+        {
+            var match = NewBlueToDeploy(
+                (PrototypeArsenal.BeachGuard, RockCell), (PrototypeArsenal.DroneShield, IceCell));
+            DeployBlue(match, PrototypeArsenal.JungleRobot, new HexCoord(1, 4));
             var end = match.Submit(Side.Blue, new EndTurnCommand());
-            var names = end.Events.Select(e => e.GetType().Name).ToList();
-            var hitPoints = match.ViewFor(Side.Red).OwnGuards.Select(g => g.HitPoints).OrderBy(h => h).ToList();
-            return (names, hitPoints, match.ViewFor(Side.Blue).OwnRobots.Any(), match.ComputeStateHash());
+            Assert.That(end.Events.OfType<RobotsClashed>(), Is.Not.Empty);
+            Assert.That(end.Events.OfType<RobotHitDefense>(), Is.Empty);
+            Assert.That(match.ViewFor(Side.Red).OwnDefenses[IceCell].HitPoints, Is.EqualTo(3));
+        }
+
+        [Test]
+        public void GuardThatClashed_DoesNotMove()
+        {
+            // Dos robots en la zona: A (junto al defensor) muere en el choque; B queda a 2 casillas.
+            var match = NewBlueToDeploy((PrototypeArsenal.SnowGuard, IceCell));
+            var near = DeployBlue(match, PrototypeArsenal.JungleRobot, new HexCoord(3, 2));
+            DeployBlue(match, PrototypeArsenal.JungleRobot, new HexCoord(4, 1));
+            var end = match.Submit(Side.Blue, new EndTurnCommand());
+            Assert.That(end.Events.OfType<RobotDestroyed>().Select(e => e.RobotId), Is.EqualTo(new[] { near }));
+            Assert.That(end.Events.OfType<GuardMoved>(), Is.Empty);
+            Assert.That(RedGuard(match).Position, Is.EqualTo(IceCell));
+        }
+
+        [Test]
+        public void Clash_CanDestroyBothSidesInTheSameExchange()
+        {
+            var (match, robotId) = Stage(PrototypeArsenal.BeachGuard, IceCell, CoastNextToIce);
+            match.Submit(Side.Blue, new EndTurnCommand());
+            match.Submit(Side.Red, new EndTurnCommand());
+            var end = match.Submit(Side.Blue, new EndTurnCommand());
+            var clash = end.Events.OfType<RobotsClashed>().Single();
+            Assert.That(clash.AttackerHitPointsLeft, Is.EqualTo(0));
+            Assert.That(clash.GuardHitPointsLeft, Is.EqualTo(0));
+            Assert.That(end.Events.OfType<RobotDestroyed>().Single().RobotId, Is.EqualTo(robotId));
+            Assert.That(end.Events.OfType<GuardDestroyed>().Single().Cell, Is.EqualTo(IceCell));
+            Assert.That(match.ViewFor(Side.Red).OwnGuards, Is.Empty);
+        }
+
+        [Test]
+        public void Guard_StaysPut_WhenItsOnlyImprovingCellIsOccupied()
+        {
+            // Intruso en (4,1): la única casilla que acerca al defensor de (2,3) es (3,2), ocupada por un escudo.
+            var match = NewBlueToDeploy(
+                (PrototypeArsenal.SnowGuard, IceCell), (PrototypeArsenal.DroneShield, new HexCoord(3, 2)));
+            DeployBlue(match, PrototypeArsenal.JungleRobot, new HexCoord(4, 1));
+            var end = match.Submit(Side.Blue, new EndTurnCommand());
+            Assert.That(end.Events.OfType<GuardMoved>(), Is.Empty);
+            Assert.That(RedGuard(match).Position, Is.EqualTo(IceCell));
+        }
+
+        [Test]
+        public void RobotDestroyedByTurret_DoesNotClash()
+        {
+            var match = NewBlueToDeploy();
+            DeployBlue(match, PrototypeArsenal.JungleRobot, new HexCoord(3, 2));
+            match.Submit(Side.Blue, new EndTurnCommand());
+            AssertAccepted(match.Submit(Side.Red, new BuildDefenseCommand(PrototypeArsenal.SnowGuard, IceCell)));
+            match.Submit(Side.Red, new EndTurnCommand());
+            var end = match.Submit(Side.Blue, new EndTurnCommand());
+            Assert.That(end.Events.OfType<TurretFired>(), Is.Not.Empty);
+            Assert.That(end.Events.OfType<RobotDestroyed>(), Has.Exactly(1).Items);
+            Assert.That(end.Events.OfType<RobotsClashed>(), Is.Empty);
+            Assert.That(RedGuard(match).HitPoints, Is.EqualTo(4));
         }
 
         [Test]
@@ -138,16 +232,13 @@ namespace Flagstorm.Core.Tests.Rules
             for (var round = 0; round < 6; round++)
             {
                 var inside = round % 2 == 0;
-                var from = inside ? FarCoast : CoastNextToRock;
                 var to = inside ? CoastNextToRock : FarCoast;
                 var stillAlive = match.ViewFor(Side.Blue).OwnRobots.Any(r => r.RobotId == robotId);
-                if (stillAlive)
-                {
-                    match.Submit(Side.Blue, new MoveRobotCommand(robotId, new[] { to }));
-                }
+                Assert.That(stillAlive, Is.True);
+                AssertAccepted(match.Submit(Side.Blue, new MoveRobotCommand(robotId, new[] { to })));
 
                 match.Submit(Side.Blue, new EndTurnCommand());
-                Assert.That(RedGuard(match).Position.DistanceTo(RockCell), Is.LessThanOrEqualTo(2), $"{from}");
+                Assert.That(RedGuard(match).Position.DistanceTo(RockCell), Is.LessThanOrEqualTo(2));
                 match.Submit(Side.Red, new EndTurnCommand());
             }
         }

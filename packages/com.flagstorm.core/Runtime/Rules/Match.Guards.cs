@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Flagstorm.Core.Arsenal;
@@ -104,7 +105,18 @@ namespace Flagstorm.Core.Rules
                 damageToRobot.TryGetValue(pair, out var toRobot);
                 clashedRobots.Add(pair.RobotId);
                 clashedGuards.Add(pair.GuardId);
-                events.Add(new RobotsClashed(attackerSide, pair.RobotId, pair.GuardId, toGuard, toRobot));
+                var robotLeft = robots.First(r => r.RobotId == pair.RobotId).HitPoints
+                    - damageToRobot.Where(p => p.Key.RobotId == pair.RobotId).Sum(p => p.Value);
+                var guardLeft = guards.First(g => g.RobotId == pair.GuardId).HitPoints
+                    - damageToGuard.Where(p => p.Key.GuardId == pair.GuardId).Sum(p => p.Value);
+                events.Add(new RobotsClashed(
+                    attackerSide,
+                    pair.RobotId,
+                    pair.GuardId,
+                    toGuard,
+                    toRobot,
+                    Math.Max(0, robotLeft),
+                    Math.Max(0, guardLeft)));
             }
 
             foreach (var guard in guards)

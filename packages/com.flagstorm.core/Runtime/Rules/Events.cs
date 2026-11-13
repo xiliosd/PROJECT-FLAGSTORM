@@ -56,7 +56,13 @@ namespace Flagstorm.Core.Rules
 
     // Golpes simultáneos entre un robot de ataque y un defensor; cada daño es el que recibe el otro bando.
     public sealed record RobotsClashed(
-        Side Attacker, int AttackerId, int GuardId, int DamageToGuard, int DamageToAttacker) : IMatchEvent;
+        Side Attacker,
+        int AttackerId,
+        int GuardId,
+        int DamageToGuard,
+        int DamageToAttacker,
+        int AttackerHitPointsLeft,
+        int GuardHitPointsLeft) : IMatchEvent;
 
     public sealed record GuardMoved(Side Owner, int RobotId, HexCoord From, HexCoord To) : IMatchEvent;
 
